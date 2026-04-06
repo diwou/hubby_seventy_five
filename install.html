@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HUB75 NTP Flip Clock Installer</title>
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <style>
+    :root {
+      --bg: #f4f0e8;
+      --panel: #fffaf2;
+      --ink: #1e2430;
+      --muted: #5d6675;
+      --line: #d8ccb8;
+      --accent: #d66a1f;
+      --accent-dark: #8a3f0c;
+      --ok: #2f7d4b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Noto Sans", "Helvetica Neue", sans-serif;
+      background:
+        radial-gradient(circle at top left, #fff6df 0, transparent 28rem),
+        linear-gradient(180deg, #efe4d1 0%, var(--bg) 45%, #ece6db 100%);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+    }
+
+    .card {
+      background: color-mix(in srgb, var(--panel) 92%, white);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: 0 18px 50px rgba(35, 24, 14, 0.08);
+      overflow: hidden;
+    }
+
+    .hero {
+      padding: 28px 28px 18px;
+      background:
+        linear-gradient(135deg, rgba(214, 106, 31, 0.12), rgba(138, 63, 12, 0.02)),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.7), transparent);
+      border-bottom: 1px solid var(--line);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.55;
+      max-width: 58ch;
+    }
+
+    .body {
+      padding: 24px 28px 28px;
+      display: grid;
+      gap: 22px;
+    }
+
+    .install-box {
+      display: grid;
+      gap: 12px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .hint, li, p {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .hint strong, li strong, p strong {
+      color: var(--ink);
+    }
+
+    ol {
+      margin: 0;
+      padding-left: 20px;
+      display: grid;
+      gap: 10px;
+    }
+
+    code {
+      background: rgba(30, 36, 48, 0.07);
+      padding: 0.15rem 0.35rem;
+      border-radius: 6px;
+      font-family: "Cascadia Code", "Fira Code", monospace;
+      font-size: 0.92em;
+    }
+
+    .footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 4px;
+      border-top: 1px dashed var(--line);
+    }
+
+    .link {
+      color: var(--accent-dark);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .link:hover {
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(47, 125, 75, 0.2);
+      background: rgba(47, 125, 75, 0.09);
+      color: var(--ok);
+      font-size: 0.92rem;
+      font-weight: 600;
+    }
+
+    @media (max-width: 640px) {
+      .hero, .body {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="card">
+      <div class="hero">
+        <h1>HUB75 NTP Flip Clock</h1>
+        <p class="lead">
+          Firmware direkt im Browser per USB auf einen ESP32-S3 flashen.
+          Fuer bereits laufende Geraete bleiben Updates wie gehabt bequem ueber das Webinterface moeglich.
+        </p>
+      </div>
+
+      <div class="body">
+        <div class="install-box">
+          <div class="badge">Empfohlen: Chrome oder Edge mit USB-Datenkabel</div>
+          <esp-web-install-button manifest="Firmware/latest/manifest.json"></esp-web-install-button>
+          <p class="hint">
+            Falls der Button keinen Port findet: anderes USB-Kabel probieren und sicherstellen,
+            dass es ein <strong>Datenkabel</strong> ist, nicht nur ein Ladekabel.
+          </p>
+        </div>
+
+        <div>
+          <h2>So geht's</h2>
+          <ol>
+            <li>ESP32-S3 per USB anschliessen.</li>
+            <li>Auf <strong>Connect</strong> klicken und den seriellen Port auswaehlen.</li>
+            <li>Bei einem neuen Geraet die vorgeschlagene Loeschung bestaetigen.</li>
+            <li>Warten, bis das Flashen abgeschlossen ist.</li>
+            <li>Danach das Geraet neu starten oder kurz neu einstecken.</li>
+          </ol>
+        </div>
+
+        <div>
+          <h2>Hinweise</h2>
+          <p>
+            Diese Seite verwendet <strong>ESP Web Tools</strong> und das automatisch erzeugte Manifest
+            unter <code>Firmware/latest/manifest.json</code>. Damit wird immer der zuletzt gebaute
+            Firmware-Stand verwendet.
+          </p>
+          <p>
+            Wenn das Geraet bereits laeuft, ist ein OTA-Update ueber das Webinterface meist einfacher
+            als ein erneutes USB-Flashen.
+          </p>
+        </div>
+
+        <div class="footer">
+          <a class="link" href="./Firmware/latest/manifest.json">Manifest ansehen</a>
+          <a class="link" href="./README.md">Projekt-README</a>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
