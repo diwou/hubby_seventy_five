@@ -27,6 +27,7 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 - `install.html` fuer einen plattformunabhaengigen USB-Erstflash per Browser hinzugefuegt. Die Seite verwendet `ESP Web Tools` und zeigt automatisch auf `Firmware/latest/manifest.json`.
 - `index.html` als Startseite fuer statisches Hosting hinzugefuegt und auf `install.html` weitergeleitet, damit Codeberg Pages die Projektseite direkt unter der Repository-URL ausliefern kann.
 - README um einen prominent platzierten Browser-Installer-Button erweitert, der direkt auf die Codeberg-Pages-Installationsseite verweist.
+- `Firmware/` wird auf `main` nicht mehr versioniert. Der lokale Build-Export bleibt erhalten, ist aber jetzt per `.gitignore` aus dem Quellcode-Branch ausgeschlossen; fuer den Browser-Installer bleibt der Ordner weiterhin auf der `pages`-Branch relevant.
 
 ## [1.5.3] — 2026-03-28
 

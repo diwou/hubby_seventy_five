@@ -5,7 +5,7 @@ Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollstän
 
 **Aktuelle Version:** 1.5.4
 
-**Repository:** https://codeberg.org/diwou/Hubby_seventy_five
+**Repository:** https://codeberg.org/diwou/hubby_seventy_five
 
 **Lizenz:** CC BY-NC-SA 4.0, siehe [LICENSE](LICENSE)
 

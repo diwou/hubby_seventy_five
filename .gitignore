@@ -1,5 +1,6 @@
 # PlatformIO — Build-Artefakte und heruntergeladene Libraries
 .pio/
+Firmware/
 
 # Lokale IDE-/Editor-Dateien
 .vscode/
