@@ -11,6 +11,12 @@ Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollstän
 
 **Browser-Installer:** `index.html` bzw. `install.html` nutzen automatisch `Firmware/latest/manifest.json`
 
+<p>
+  <a href="https://diwou.codeberg.page/hubby_seventy_five/">
+    <img src="https://img.shields.io/badge/USB%20Installer-Open%20In%20Browser-d66a1f?style=for-the-badge" alt="USB Installer im Browser oeffnen">
+  </a>
+</p>
+
 ---
 
 ## Inhalt
