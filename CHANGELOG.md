@@ -25,6 +25,7 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 - `.gitignore` fuer die Veroeffentlichung geschaerft: lokale IDE-Dateien, Build-Artefakte, KI-/Agent-Konfigurationen, Caches und persoenliche Notizen werden jetzt vom Repository ausgeschlossen.
 - PlatformIO exportiert nach jedem erfolgreichen Build automatisch einen versionierten Firmware-Ordner unter `Firmware/<Version>/` sowie `Firmware/latest/`, inklusive `bootloader.bin`, `partitions.bin`, `boot_app0.bin`, `firmware.bin` und passender `manifest.json` fuer Web-Flasher.
 - `install.html` fuer einen plattformunabhaengigen USB-Erstflash per Browser hinzugefuegt. Die Seite verwendet `ESP Web Tools` und zeigt automatisch auf `Firmware/latest/manifest.json`.
+- `index.html` als Startseite fuer statisches Hosting hinzugefuegt und auf `install.html` weitergeleitet, damit Codeberg Pages die Projektseite direkt unter der Repository-URL ausliefern kann.
 
 ## [1.5.3] — 2026-03-28
 
