@@ -9,7 +9,7 @@ Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollstän
 
 **Lizenz:** CC BY-NC-SA 4.0, siehe [LICENSE](LICENSE)
 
-**Browser-Installer:** `install.html` nutzt automatisch `Firmware/latest/manifest.json`
+**Browser-Installer:** `index.html` bzw. `install.html` nutzen automatisch `Firmware/latest/manifest.json`
 
 ---
 
@@ -125,8 +125,8 @@ Dort liegen jeweils:
 
 Damit hast Du pro Version direkt einen vorbereiteten Satz fuer Browser-Flasher oder Release-Downloads.
 
-Fuer einen einfachen USB-Erstflash ohne IDE gibt es ausserdem die Datei `install.html`.
-Sie kann statisch gehostet werden, z. B. ueber Codeberg Pages, und verwendet automatisch den neuesten Export aus `Firmware/latest/manifest.json`.
+Fuer einen einfachen USB-Erstflash ohne IDE gibt es ausserdem die Dateien `index.html` und `install.html`.
+`index.html` dient als Startseite fuer statisches Hosting wie Codeberg Pages und leitet auf den eigentlichen Installer weiter. `install.html` verwendet automatisch den neuesten Export aus `Firmware/latest/manifest.json`.
 
 > **OTA vs. USB:** In `platformio.ini` ist standardmäßig OTA (`upload_protocol = espota`) konfiguriert.
 > Für USB-Flash die Zeile `upload_protocol = espota` auskommentieren und `upload_port = /dev/ttyACM0` einkommentieren.
