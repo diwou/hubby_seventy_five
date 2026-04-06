@@ -9,6 +9,8 @@ Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollstän
 
 **Lizenz:** CC BY-NC-SA 4.0, siehe [LICENSE](LICENSE)
 
+**Browser-Installer:** `install.html` nutzt automatisch `Firmware/latest/manifest.json`
+
 ---
 
 ## Inhalt
@@ -106,6 +108,25 @@ pio device monitor
 # Build-Verzeichnis leeren
 pio run --target clean
 ```
+
+Nach jedem erfolgreichen `pio run` exportiert PlatformIO die flashbaren Dateien automatisch nach:
+
+```text
+Firmware/<Version>/
+Firmware/latest/
+```
+
+Dort liegen jeweils:
+- `bootloader.bin`
+- `partitions.bin`
+- `boot_app0.bin`
+- `firmware.bin`
+- `manifest.json`
+
+Damit hast Du pro Version direkt einen vorbereiteten Satz fuer Browser-Flasher oder Release-Downloads.
+
+Fuer einen einfachen USB-Erstflash ohne IDE gibt es ausserdem die Datei `install.html`.
+Sie kann statisch gehostet werden, z. B. ueber Codeberg Pages, und verwendet automatisch den neuesten Export aus `Firmware/latest/manifest.json`.
 
 > **OTA vs. USB:** In `platformio.ini` ist standardmäßig OTA (`upload_protocol = espota`) konfiguriert.
 > Für USB-Flash die Zeile `upload_protocol = espota` auskommentieren und `upload_port = /dev/ttyACM0` einkommentieren.

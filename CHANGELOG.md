@@ -23,6 +23,8 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 - README fuer die Codeberg-Veroeffentlichung aktualisiert: aktuelle Version, Repository-URL, Lizenzhinweis und Clone-Beispiel ergaenzt; veraltete Kurz-Changelog-Tabelle durch Verweis auf `CHANGELOG.md` ersetzt.
 - AGENTS.md um feste Repo-Metadaten fuer Codeberg und die verwendete Lizenz `CC BY-NC-SA 4.0` erweitert.
 - `.gitignore` fuer die Veroeffentlichung geschaerft: lokale IDE-Dateien, Build-Artefakte, KI-/Agent-Konfigurationen, Caches und persoenliche Notizen werden jetzt vom Repository ausgeschlossen.
+- PlatformIO exportiert nach jedem erfolgreichen Build automatisch einen versionierten Firmware-Ordner unter `Firmware/<Version>/` sowie `Firmware/latest/`, inklusive `bootloader.bin`, `partitions.bin`, `boot_app0.bin`, `firmware.bin` und passender `manifest.json` fuer Web-Flasher.
+- `install.html` fuer einen plattformunabhaengigen USB-Erstflash per Browser hinzugefuegt. Die Seite verwendet `ESP Web Tools` und zeigt automatisch auf `Firmware/latest/manifest.json`.
 
 ## [1.5.3] — 2026-03-28
 
