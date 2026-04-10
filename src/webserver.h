@@ -6,6 +6,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
+#include <Update.h>
 #include <LittleFS.h>
 #include "lwip/apps/sntp.h"
 #include "config.h"
@@ -20,6 +21,8 @@ bool            apModeActive  = false;
 bool            otaRunning    = false;
 bool            restartPending = false;
 bool            factoryResetPending = false;
+static bool     webUpdateOk   = false;
+static String   webUpdateError = "";
 
 // Externe Variablen (definiert in main.cpp / display.h)
 extern bool     ntpSynced;
@@ -228,6 +231,12 @@ input[type=checkbox]{width:auto;margin-right:6px}
   <label><input type="checkbox" id="ota_enabled"> OTA-Updates aktiviert</label>
   <label>OTA-Passwort (leer = kein Passwort) <input id="ota_password" type="password" maxlength="32"></label>
   <button class="btn btn-save" onclick="save()">Speichern</button>
+  <hr style="border-color:#333;margin:12px 0">
+  <label>Firmware-Datei (`.bin`) vom Release oder lokalen Build auswählen
+    <input id="fw_file" type="file" accept=".bin,application/octet-stream">
+  </label>
+  <button class="btn btn-info" onclick="uploadFirmware()">Firmware jetzt einspielen</button>
+  <p id="otaUploadStatus" style="margin-top:8px;font-size:.85em;color:#aaa"></p>
   <p style="margin-top:10px;font-size:.8em;color:#888">OTA-Hostname: hub75clock.local &nbsp;|&nbsp; Port: 8266</p>
 </div>
 
@@ -367,6 +376,34 @@ async function searchCity(){
     box.style.display='block';
   }catch(e){showMsg('Suche fehlgeschlagen',false);}
   btn.disabled=false;btn.textContent='Suchen';
+}
+
+async function uploadFirmware(){
+  const fileEl=document.getElementById('fw_file');
+  const statusEl=document.getElementById('otaUploadStatus');
+  const file=fileEl.files&&fileEl.files[0];
+  if(!file){showMsg('Bitte zuerst eine Firmware-Datei (.bin) auswaehlen',false);return;}
+  if(!confirm('Firmware wirklich hochladen und das Geraet danach neu starten?'))return;
+
+  const form=new FormData();
+  form.append('firmware',file,file.name);
+  statusEl.textContent='Upload laeuft...';
+
+  try{
+    const r=await fetch('/api/update',{method:'POST',body:form});
+    const j=await r.json();
+    if(j.ok){
+      statusEl.textContent='Upload erfolgreich. Neustart laeuft...';
+      showMsg('Firmware eingespielt. Geraet startet neu...',true);
+      setTimeout(()=>location.reload(),8000);
+    }else{
+      statusEl.textContent='Upload fehlgeschlagen';
+      showMsg('Firmware-Update fehlgeschlagen: '+(j.error||'?'),false);
+    }
+  }catch(e){
+    statusEl.textContent='Upload fehlgeschlagen';
+    showMsg('Firmware-Upload fehlgeschlagen',false);
+  }
 }
 
 loadConfig();
@@ -611,6 +648,69 @@ void webServerSetup() {
         req->send(200, "application/json", "{\"ok\":true}");
         restartPending = true;
     });
+
+    // POST /api/update - Firmware-Datei direkt ueber das Webinterface einspielen
+    webServer.on("/api/update", HTTP_POST,
+        [](AsyncWebServerRequest* req) {
+            if (webUpdateOk) {
+                req->send(200, "application/json", "{\"ok\":true}");
+                restartPending = true;
+            } else {
+                String err = webUpdateError.isEmpty() ? "Update fehlgeschlagen" : webUpdateError;
+                String out = "{\"ok\":false,\"error\":\"" + err + "\"}";
+                req->send(500, "application/json", out);
+                otaRunning = false;
+                displaySetOtaActive(false);
+            }
+        },
+        [](AsyncWebServerRequest* req, const String& filename, size_t index,
+           uint8_t* data, size_t len, bool final) {
+            if (index == 0) {
+                webUpdateOk = false;
+                webUpdateError = "";
+                otaRunning = true;
+                displaySetOtaActive(true);
+                displayShowOTA(0, req->contentLength() > 0 ? req->contentLength() : 1);
+
+                if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+                    webUpdateError = Update.errorString();
+                    otaRunning = false;
+                    displaySetOtaActive(false);
+                    return;
+                }
+                Serial.printf("[WebUpdate] Starte Update: %s\n", filename.c_str());
+            }
+
+            if (webUpdateError.isEmpty()) {
+                if (Update.write(data, len) != len) {
+                    webUpdateError = Update.errorString();
+                } else {
+                    size_t done = index + len;
+                    size_t total = req->contentLength() > 0 ? req->contentLength() : done;
+                    displayShowOTA((uint32_t)done, (uint32_t)total);
+                }
+            }
+
+            if (final) {
+                if (!webUpdateError.isEmpty()) {
+                    Update.abort();
+                    otaRunning = false;
+                    displaySetOtaActive(false);
+                    Serial.printf("[WebUpdate] Fehler: %s\n", webUpdateError.c_str());
+                    return;
+                }
+                if (!Update.end(true)) {
+                    webUpdateError = Update.errorString();
+                    otaRunning = false;
+                    displaySetOtaActive(false);
+                    Serial.printf("[WebUpdate] End-Fehler: %s\n", webUpdateError.c_str());
+                    return;
+                }
+                webUpdateOk = true;
+                Serial.println("[WebUpdate] Erfolgreich, Neustart folgt.");
+            }
+        }
+    );
 
     webServer.begin();
 }

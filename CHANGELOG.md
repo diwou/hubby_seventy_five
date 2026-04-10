@@ -10,8 +10,8 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ## [Next]
 
-### Planned
-- Webinterface um eine Firmware-Update-Moeglichkeit direkt auf der Uhr erweitern [`ff69d45`]
+### Added
+- Webinterface um eine Firmware-Update-Moeglichkeit direkt auf der Uhr erweitert: Im OTA-Tab kann jetzt eine `.bin`-Datei per Browser hochgeladen und direkt eingespielt werden; danach startet das Geraet automatisch neu [`uncommitted`]
 
 ## [1.6.0] - 2026-04-10
 
