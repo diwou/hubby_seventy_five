@@ -4,27 +4,26 @@ Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumenti
 
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
-Ab `1.6.0` koennen pro Versionsblock zusaetzlich Codeberg-Referenzen gepflegt werden, z. B. fuer Releases, Issues oder spaetere Milestones, ohne fuer jede kleine Aenderung am selben Tag eine neue Versionsnummer zu brauchen.
+Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten stehen, damit auch bei mehreren Commits am selben Tag jede Aenderung eindeutig nachvollziehbar bleibt. Sammel-IDs nur fuer Release-/Milestone-Metadaten, nicht als Ersatz fuer Einzelreferenzen.
 
 ---
 
 ## [1.6.0] - 2026-04-10
 
 ### Codeberg
-- Commit: `137107d` auf Branch `main`
 - Release-ID: folgt nach Test und expliziter Freigabe
 
 ### Added
-- Zweites HUB75-Panel als Daisy-Chain unterstützt (`DISPLAY_PANELS = 2`)
-- `DISPLAY_W`-Konstante für einfache Anpassung der Panelanzahl
-- Datum auf rechtes Panel verschoben: Zeile 1 voller Wochentag (zentriert), Zeile 2 `TT.MM.JJJJ` (zentriert)
-- `_weekdayFull()` für vollständige Wochentagnamen (DE/EN)
+- Zweites HUB75-Panel als Daisy-Chain unterstützt (`DISPLAY_PANELS = 2`) [`bdcf033`]
+- `DISPLAY_W`-Konstante für einfache Anpassung der Panelanzahl [`bdcf033`]
+- Datum auf rechtes Panel verschoben: Zeile 1 voller Wochentag (zentriert), Zeile 2 `TT.MM.JJJJ` (zentriert) [`bdcf033`]
+- `_weekdayFull()` für vollständige Wochentagnamen (DE/EN) [`bdcf033`]
 
 ### Changed
-- Scroll-Text in der Wetterzeile läuft jetzt über beide Panels (128 px Gesamtbreite)
-- Scrolltext des aktuellen Wetters beginnt jetzt mit `Aktuell:` und verwendet Temperaturangaben mit Abstand vor der Einheit, z. B. `+12.4 C`
-- Vorhersage-Kacheln zeigen jetzt 3-Buchstaben-Wochentage, Temperatur-Einheiten und Leerzeichen um den Trenner, z. B. `Fre +15 C / +3 C`
-- Uhrzeit links vertikal deutlich vergrößert; `HH:MM` nutzt jetzt ein eigenes 16px-hohes Rendering mit sichtbarer Zeilenverdopplung statt der bisherigen unveränderten Glyphenwirkung
+- Scroll-Text in der Wetterzeile läuft jetzt über beide Panels (128 px Gesamtbreite) [`bdcf033`]
+- Scrolltext des aktuellen Wetters beginnt jetzt mit `Aktuell:` und verwendet Temperaturangaben mit Abstand vor der Einheit, z. B. `+12.4 C` [`bdcf033`]
+- Vorhersage-Kacheln zeigen jetzt 3-Buchstaben-Wochentage, Temperatur-Einheiten und Leerzeichen um den Trenner, z. B. `Fre +15 C / +3 C` [`573a364`]
+- Uhrzeit links vertikal deutlich vergrößert; `HH:MM` nutzt jetzt ein eigenes 16px-hohes Rendering mit sichtbarer Zeilenverdopplung statt der bisherigen unveränderten Glyphenwirkung [`137107d`]
 
 ## [1.5.4] — 2026-04-06
 
