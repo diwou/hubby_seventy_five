@@ -11,7 +11,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ## [Next]
 
 ### Planned
-- Webinterface um eine Firmware-Update-Moeglichkeit direkt auf der Uhr erweitern [`uncommitted`]
+- Webinterface um eine Firmware-Update-Moeglichkeit direkt auf der Uhr erweitern [`ff69d45`]
 
 ## [1.6.0] - 2026-04-10
 
