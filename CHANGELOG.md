@@ -4,7 +4,26 @@ Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumenti
 
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
+Ab `1.6.0` koennen pro Versionsblock zusaetzlich Codeberg-Referenzen gepflegt werden, z. B. fuer Releases, Issues oder spaetere Milestones, ohne fuer jede kleine Aenderung am selben Tag eine neue Versionsnummer zu brauchen.
+
 ---
+
+## [1.6.0] - 2026-04-10
+
+### Codeberg
+- IDs/Referenzen: werden nach dem Anlegen von Release und zugehoerigen Eintraegen ergaenzt
+
+### Added
+- Zweites HUB75-Panel als Daisy-Chain unterstützt (`DISPLAY_PANELS = 2`)
+- `DISPLAY_W`-Konstante für einfache Anpassung der Panelanzahl
+- Datum auf rechtes Panel verschoben: Zeile 1 voller Wochentag (zentriert), Zeile 2 `TT.MM.JJJJ` (zentriert)
+- `_weekdayFull()` für vollständige Wochentagnamen (DE/EN)
+
+### Changed
+- Scroll-Text in der Wetterzeile läuft jetzt über beide Panels (128 px Gesamtbreite)
+- Scrolltext des aktuellen Wetters beginnt jetzt mit `Aktuell:` und verwendet Temperaturangaben mit Abstand vor der Einheit, z. B. `+12.4 C`
+- Vorhersage-Kacheln zeigen jetzt 3-Buchstaben-Wochentage sowie Temperatur-Einheiten an, z. B. `Fre +15 C/+3 C`
+- Uhrzeit links vertikal vergrößert; die HH:MM-Ziffern nutzen den frei gewordenen Platz oberhalb der Wetterzeile besser aus
 
 ## [1.5.4] — 2026-04-06
 

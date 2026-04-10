@@ -351,10 +351,10 @@ String forecastDayName(int dayOffset) {
     struct tm t;
     localtime_r(&now, &t);
     if (cfg.lang == "de") {
-        const char* days[] = {"So","Mo","Di","Mi","Do","Fr","Sa"};
+        const char* days[] = {"Son","Mon","Die","Mit","Don","Fre","Sam"};
         return String(days[t.tm_wday]);
     } else {
-        const char* days[] = {"Su","Mo","Tu","We","Th","Fr","Sa"};
+        const char* days[] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
         return String(days[t.tm_wday]);
     }
 }

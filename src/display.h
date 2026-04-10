@@ -27,6 +27,8 @@ static constexpr int PIN_OE  = 18;
 }
 
 static constexpr uint8_t DISPLAY_BOOT_BRIGHTNESS = 4;
+static constexpr int     DISPLAY_PANELS = 2;            // Anzahl verketteter HUB75-Panels
+static constexpr int     DISPLAY_W      = 64 * DISPLAY_PANELS;  // Virtuelle Breite in Pixel
 
 static void displayPreparePins() {
     const int pins[] = {
@@ -82,8 +84,9 @@ void displayInit() {
         DisplayPins::PIN_A, DisplayPins::PIN_B, DisplayPins::PIN_C, DisplayPins::PIN_D, -1,
         DisplayPins::PIN_LAT, DisplayPins::PIN_OE, DisplayPins::PIN_CLK
     };
-    HUB75_I2S_CFG mxconfig(64, 32, 1, pinmap, HUB75_I2S_CFG::FM6126A,
-                           HUB75_I2S_CFG::TYPE138, true);
+    // double_buff=false: mit 2 Panels reicht der DMA-Speicher (internes SRAM) nicht fuer double buffering
+    HUB75_I2S_CFG mxconfig(64, 32, DISPLAY_PANELS, pinmap, HUB75_I2S_CFG::FM6126A,
+                           HUB75_I2S_CFG::TYPE138, false);
 
     dma_display = new MatrixPanel_I2S_DMA(mxconfig);
     dma_display->begin();
@@ -152,6 +155,10 @@ void colorsInit() {
 // ============================================================
 #define DIGIT_W  10
 #define DIGIT_H  14
+static constexpr int DIGIT_VISIBLE_H_HHMM   = 13;
+static constexpr int DIGIT_VISIBLE_H_HHMMSS = 9;
+static constexpr char NARROW_SPACE_MARKER   = '\x1f';
+static constexpr int  NARROW_SPACE_PX       = 3;
 
 // ============================================================
 // Bitmap-Font 10×14: modern, bold (3px horizontal, 2px vertikal)
@@ -192,12 +199,31 @@ static const uint16_t _digits[11][14] PROGMEM = {
 // cols: Anzahl gezeichneter Spalten (DIGIT_W=10 oder 9 für HH:MM:SS)
 // Zeile 13 wird nie gezeichnet (Clip dy >= DIGIT_H-1) → 1px Gap
 // ============================================================
+static inline int _digitVisibleHeight() {
+    return (cfg.seconds_mode == 3) ? DIGIT_VISIBLE_H_HHMMSS : DIGIT_VISIBLE_H_HHMM;
+}
+
+static inline int _secondsBarY() {
+    return (cfg.seconds_mode == 3) ? 10 : 15;
+}
+
+static inline int _clockAreaHeight() {
+    return (cfg.seconds_mode == 3) ? DIGIT_VISIBLE_H_HHMMSS : (_secondsBarY() + 2);
+}
+
+static int _mapDigitRow(int row, int visibleH) {
+    if (visibleH <= DIGIT_VISIBLE_H_HHMMSS) return row;
+    static const uint8_t scaledRows[DIGIT_VISIBLE_H_HHMM] = {1, 1, 2, 2, 3, 3, 4, 5, 6, 6, 7, 8, 8};
+    return scaledRows[row];
+}
+
 static void _drawDigitAt(int x, int idx, int yOff, uint16_t color, int cols = DIGIT_W) {
     if (idx < 0 || idx > 10) return;
-    for (int row = 0; row < DIGIT_H; row++) {
+    int visibleH = _digitVisibleHeight();
+    for (int row = 0; row < visibleH; row++) {
         int dy = row + yOff;
-        if (dy < 0 || dy >= 9) continue;
-        uint16_t bits = pgm_read_word(&_digits[idx][row]);
+        if (dy < 0 || dy >= visibleH) continue;
+        uint16_t bits = pgm_read_word(&_digits[idx][_mapDigitRow(row, visibleH)]);
         for (int col = 0; col < cols; col++) {
             if (bits & (1u << (DIGIT_W - 1 - col)))
                 dma_display->drawPixel(x + col, dy, color);
@@ -231,9 +257,10 @@ static uint8_t digitDirty[6] = {2, 2, 2, 2, 2, 2};
 static void _drawClockDigit(int x, const FlipDigit& d, int cols) {
     int ci = (d.cur    == ' ') ? 10 : (d.cur    - '0');
     int ti = (d.target == ' ') ? 10 : (d.target - '0');
+    int visibleH = _digitVisibleHeight();
 
     // Slot schwarz löschen (nur diesen Slot, Zifferninhalt ist in y=0..8)
-    dma_display->fillRect(x, 0, cols, 9, C_BLACK);
+    dma_display->fillRect(x, 0, cols, visibleH, C_BLACK);
 
     if (d.frame < 0) {
         _drawDigitAt(x, ci, 0, C_DIGIT, cols);
@@ -241,10 +268,10 @@ static void _drawClockDigit(int x, const FlipDigit& d, int cols) {
         // Slide-Up: Phase 1 (0-8) alte raus, Phase 2 (9-16) neue rein, je 1px/Frame.
         // Clip in _drawDigitAt bei dy>=9 → Animation strikt innerhalb y=0..8.
         // Frame 8: letzte Ziffer (Row 8) bei dy=0; Frame 9: neue (Row 1) bei dy=8 — kein Gap.
-        if (d.frame <= 8)
+        if (d.frame <= visibleH - 1)
             _drawDigitAt(x, ci, -d.frame,     C_DIGIT, cols);
         else
-            _drawDigitAt(x, ti, 16 - d.frame, C_DIGIT, cols);
+            _drawDigitAt(x, ti, (visibleH * 2 - 2) - d.frame, C_DIGIT, cols);
     } else {
         // Cross-Dissolve
         if (d.frame <= 6)
@@ -267,7 +294,8 @@ static void _drawClockDigit(int x, const FlipDigit& d, int cols) {
 static void _drawFlipClock() {
     uint32_t now          = millis();
     uint32_t ms_per_frame = (cfg.anim_mode == 0) ? 15 : 18;
-    int      maxFrame     = (cfg.anim_mode == 0) ? 17 : 14;  // Slide-Up: 17 Frames, Cross-Dissolve: 14
+    int      visibleH     = _digitVisibleHeight();
+    int      maxFrame     = (cfg.anim_mode == 0) ? (visibleH * 2 - 1) : 14;
     int      nDigits      = (cfg.seconds_mode == 3) ? 6 : 4;
     int      cols         = (cfg.seconds_mode == 3) ? DIGIT_W - 2 : DIGIT_W;
 
@@ -319,8 +347,8 @@ static void _drawFlipClock() {
         dma_display->fillRect(42, 7, 2, 2, cc);
     } else {
         // HH:MM: 2×2px Kolon-Punkte (je 3px Abstand zu den Zifferblöcken)
-        dma_display->fillRect(31, 1, 2, 2, cc);
-        dma_display->fillRect(31, 7, 2, 2, cc);
+        dma_display->fillRect(31, 3, 2, 2, cc);
+        dma_display->fillRect(31, 10, 2, 2, cc);
     }
 }
 
@@ -350,7 +378,8 @@ static void _setFlipTime(int h, int m, int s) {
     gettimeofday(&tv, nullptr);
     int msInSec     = (int)(tv.tv_usec / 1000);  // 0..999 ms in der aktuellen Sekunde
     int mspf        = (cfg.anim_mode == 0) ? 15 : 18;
-    int maxFr       = (cfg.anim_mode == 0) ? 17 : 14;
+    int visibleH    = _digitVisibleHeight();
+    int maxFr       = (cfg.anim_mode == 0) ? (visibleH * 2 - 1) : 14;
     int startFr     = (cfg.anim_mode == 2) ? 0 : min(msInSec / mspf, maxFr - 1);
     int msIntoFrame = (cfg.anim_mode == 2) ? 0 : (msInSec % mspf);
 
@@ -383,27 +412,28 @@ static inline uint16_t _secColor(int i) {
 
 static void _drawSeconds(int sec) {
     if (cfg.seconds_mode == 3) return;  // Sekunden im Zeitdisplay
+    int y = _secondsBarY();
 
     if (cfg.seconds_mode == 0) {
         // Bar: ausgefüllt bis sec
         for (int i = 0; i < sec; i++) {
-            dma_display->drawPixel(i + 2, 10, _secColor(i));
-            dma_display->drawPixel(i + 2, 11, _secColor(i));
+            dma_display->drawPixel(i + 2, y,     _secColor(i));
+            dma_display->drawPixel(i + 2, y + 1, _secColor(i));
         }
 
     } else if (cfg.seconds_mode == 1) {
         // Pulse: ein wandernder Punkt mit Schweif
         int x = sec + 2;
-        dma_display->fillRect(x, 10, 1, 2, C_DIGIT);
-        if (sec > 0) dma_display->fillRect(x - 1, 10, 1, 2, C_COLON);
-        if (sec > 1) dma_display->fillRect(x - 2, 10, 1, 2, C_DIGIT_DIM);
+        dma_display->fillRect(x,     y, 1, 2, C_DIGIT);
+        if (sec > 0) dma_display->fillRect(x - 1, y, 1, 2, C_COLON);
+        if (sec > 1) dma_display->fillRect(x - 2, y, 1, 2, C_DIGIT_DIM);
 
     } else if (cfg.seconds_mode == 2) {
         // Dots: alle vergangenen Sekunden leuchten, Rest dunkel
         for (int i = 0; i < 60; i++) {
             uint16_t col = (i < sec) ? _secColor(i) : C_DIGIT_DIM;
-            dma_display->drawPixel(i + 2, 10, col);
-            dma_display->drawPixel(i + 2, 11, col);
+            dma_display->drawPixel(i + 2, y,     col);
+            dma_display->drawPixel(i + 2, y + 1, col);
         }
     }
 }
@@ -419,6 +449,16 @@ static const char* _weekday(int wday) {
         return d[wday];
     } else {
         static const char* d[] = {"Su","Mo","Tu","We","Th","Fr","Sa"};
+        return d[wday];
+    }
+}
+
+static const char* _weekdayFull(int wday) {
+    if (cfg.lang == "de") {
+        static const char* d[] = {"Sonntag","Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag"};
+        return d[wday];
+    } else {
+        static const char* d[] = {"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"};
         return d[wday];
     }
 }
@@ -496,6 +536,34 @@ static void _drawDate(struct tm* t) {
     }
 }
 
+// Datum rechtes Panel: Wochentag (y=3) + "TT.MM.JJJJ" (y=13), jeweils zentriert in X=64..127
+static void _drawDateRight(struct tm* t) {
+    char dd[3], mm[3], yyyy[5];
+    snprintf(dd,   sizeof(dd),   "%02d", t->tm_mday);
+    snprintf(mm,   sizeof(mm),   "%02d", t->tm_mon + 1);
+    snprintf(yyyy, sizeof(yyyy), "%04d", t->tm_year + 1900);
+
+    dma_display->setTextSize(1);
+
+    // Zeile 1: voller Wochentag, zentriert in X=64..127
+    const char* wday = _weekdayFull(t->tm_wday);
+    int xw = 64 + max(0, (64 - (int)strlen(wday) * 6) / 2);
+    dma_display->setTextColor(C_WARN);
+    dma_display->setCursor(xw, 3);
+    dma_display->print(wday);
+
+    // Zeile 2: "TT.MM.JJJJ" (60px) zentriert → x=66
+    dma_display->setTextColor(C_DATE);
+    dma_display->setCursor(66, 13);
+    dma_display->print(dd);                    // cursor → 78
+    dma_display->fillRect(79, 18, 2, 2, C_DATE);
+    dma_display->setCursor(83, 13);
+    dma_display->print(mm);                    // cursor → 95
+    dma_display->fillRect(96, 18, 2, 2, C_DATE);
+    dma_display->setCursor(100, 13);
+    dma_display->print(yyyy);                  // last glyph x=123
+}
+
 // ============================================================
 // Wetter-Zeile (y=23)
 // Modus 0: aktuelles Wetter scrollend
@@ -503,7 +571,7 @@ static void _drawDate(struct tm* t) {
 // ============================================================
 static uint8_t   weatherMode      = 0;
 static uint32_t  weatherLastMs    = 0;
-static int       weatherScrollX   = 64;
+static int       weatherScrollX   = DISPLAY_W;
 static uint32_t  weatherScrollMs  = 0;
 static String    weatherScrollStr = "";
 static int8_t    forecastSlideY   = 0;    // 0=Endposition, >0=Einschub-Animation von unten
@@ -523,6 +591,7 @@ static uint8_t   datDirty     = 2;
 // fillRect(0, 21, 64, 11) deckt y-2=21 ab (weather-y=23).
 // ============================================================
 static void _drawCharEx(int x, int y, uint8_t c, uint16_t color) {
+    if (c == (uint8_t)NARROW_SPACE_MARKER) return;
     char base = 0;
     bool upper = false;
     switch (c) {
@@ -543,14 +612,38 @@ static void _drawCharEx(int x, int y, uint8_t c, uint16_t color) {
     }
 }
 
+static inline int _glyphAdvance(uint8_t c) {
+    return (c == (uint8_t)NARROW_SPACE_MARKER) ? NARROW_SPACE_PX : 6;
+}
+
+static int _textWidthEx(const String& s) {
+    int width = 0;
+    const uint8_t* p = (const uint8_t*)s.c_str();
+    while (*p) width += _glyphAdvance(*p++);
+    return width;
+}
+
 // Gibt String mit Umlaut-Unterstützung aus; liefert End-x zurück.
 static int _printStrEx(int x, int y, const String& s, uint16_t color) {
     const uint8_t* p = (const uint8_t*)s.c_str();
     while (*p) {
-        _drawCharEx(x, y, *p++, color);
-        x += 6;
+        uint8_t c = *p++;
+        _drawCharEx(x, y, c, color);
+        x += _glyphAdvance(c);
     }
     return x;
+}
+
+static int _drawTempWithUnit(int x, int y, const char* temp, uint16_t tempColor,
+                             const char* unit, uint16_t unitColor) {
+    int tempPx = (int)strlen(temp) * 6;
+    dma_display->setTextColor(tempColor);
+    dma_display->setCursor(x, y);
+    dma_display->print(temp);
+    dma_display->setTextColor(unitColor);
+    dma_display->setCursor(x + tempPx + NARROW_SPACE_PX, y);
+    dma_display->print(unit);
+    return x + tempPx + NARROW_SPACE_PX + 6;
 }
 
 static void _buildCurrentStr() {
@@ -559,17 +652,18 @@ static void _buildCurrentStr() {
         return;
     }
     const char* u = (cfg.owm_unit == 0) ? "C" : "F";
-    char buf[80];
+    char buf[128];
     // Heutige Tages-Vorhersage anhängen, falls verfügbar
     bool todayOk = (weather.today.temp_day != 0 || weather.today.temp_night != 0);
     if (todayOk) {
-        snprintf(buf, sizeof(buf), "%+.1f%s  %s / Heute: %+d/%+d%s",
-                 weather.current_temp, u, weather.current_cond.c_str(),
+        snprintf(buf, sizeof(buf), "Aktuell: %+.1f%c%s  %s / Heute: %+d%c%s / %+d%c%s",
+                 weather.current_temp, NARROW_SPACE_MARKER, u, weather.current_cond.c_str(),
                  (int)roundf(weather.today.temp_day),
-                 (int)roundf(weather.today.temp_night), u);
+                 NARROW_SPACE_MARKER, u,
+                 (int)roundf(weather.today.temp_night), NARROW_SPACE_MARKER, u);
     } else {
-        snprintf(buf, sizeof(buf), "%+.1f%s  %s",
-                 weather.current_temp, u, weather.current_cond.c_str());
+        snprintf(buf, sizeof(buf), "Aktuell: %+.1f%c%s  %s",
+                 weather.current_temp, NARROW_SPACE_MARKER, u, weather.current_cond.c_str());
     }
     weatherScrollStr = String(buf);
 }
@@ -579,36 +673,34 @@ static void _buildCurrentStr() {
 // yOff > 0: Einschub-Animation (Inhalt erscheint tiefer, scrollt nach oben)
 static void _drawForecastStatic(int idx, int yOff = 0) {
     char dayBuf[6], nightBuf[6];
+    const char* unit = (cfg.owm_unit == 0) ? "C" : "F";
     snprintf(dayBuf,   sizeof(dayBuf),   "%+d", (int)roundf(weather.forecast[idx].temp_day));
     snprintf(nightBuf, sizeof(nightBuf), "%+d", (int)roundf(weather.forecast[idx].temp_night));
     String dayName = forecastDayName(idx + 1);
 
-    // Breite: "Mo"(12) + " "(6) + dayT + "/"(6) + nightT → zentriert
+    // Breite: "Fre"(18) + " "(6) + dayT + " C / " + nightT + " C" → zentriert
     int dayPx   = strlen(dayBuf)   * 6;
     int nightPx = strlen(nightBuf) * 6;
-    int totalW  = 12 + 6 + dayPx + 6 + nightPx;
-    int x       = max(0, (64 - totalW) / 2);
+    int unitPx  = NARROW_SPACE_PX + 6;
+    int dayNamePx = dayName.length() * 6;
+    int totalW  = dayNamePx + 6 + dayPx + unitPx + 6 + nightPx + unitPx;
+    int x       = max(0, (DISPLAY_W - totalW) / 2);
     const int y = 23 + yOff;
 
     dma_display->setTextSize(1);
     dma_display->setTextColor(C_WARN);
     dma_display->setCursor(x, y);
     dma_display->print(dayName);
-    x += 18;  // 12px Name + 6px Lücke
+    x += dayNamePx + 6;
 
-    dma_display->setTextColor(C_TEMP);
-    dma_display->setCursor(x, y);
-    dma_display->print(dayBuf);
-    x += dayPx;
+    x = _drawTempWithUnit(x, y, dayBuf, C_TEMP, unit, C_INFO);
 
     dma_display->setTextColor(C_INFO);
     dma_display->setCursor(x, y);
     dma_display->print("/");
     x += 6;
 
-    dma_display->setTextColor(C_DATE);
-    dma_display->setCursor(x, y);
-    dma_display->print(nightBuf);
+    x = _drawTempWithUnit(x, y, nightBuf, C_DATE, unit, C_INFO);
 }
 
 static void _drawWeatherLine() {
@@ -626,8 +718,8 @@ static void _drawWeatherLine() {
         // --- Modus 0: aktuelles Wetter scrollend ---
         if (now - weatherScrollMs >= cfg.scroll_speed_ms) {
             weatherScrollMs = now;
-            int textPx = weatherScrollStr.length() * 6;
-            if (textPx > 60) {
+            int textPx = _textWidthEx(weatherScrollStr);
+            if (textPx > DISPLAY_W - 4) {
                 weatherScrollX--;
                 if (weatherScrollX < -textPx) {
                     weatherScrollX = -textPx;  // einfrieren
@@ -640,16 +732,16 @@ static void _drawWeatherLine() {
                         } else {
                             _buildCurrentStr();  // kein Forecast: neu aufbauen
                         }
-                        weatherScrollX = 64;
+                        weatherScrollX = DISPLAY_W;
                     }
                 }
             } else {
-                weatherScrollX = (64 - textPx) / 2;
+                weatherScrollX = (DISPLAY_W - textPx) / 2;
                 if (now - weatherLastMs >= cyclems) {
                     weatherLastMs = now;
                     if (maxMode > 1) {
                         weatherMode    = 1;
-                        weatherScrollX = 64;
+                        weatherScrollX = DISPLAY_W;
                         forecastSlideY = cfg.forecast_scroll_up ? 10 : 0;
                         forecastSlideMs = now;
                     } else {
@@ -672,7 +764,7 @@ static void _drawWeatherLine() {
             weatherMode   = (weatherMode + 1) % maxMode;
             if (weatherMode == 0) {
                 _buildCurrentStr();
-                weatherScrollX = 64;
+                weatherScrollX = DISPLAY_W;
             } else {
                 forecastSlideY  = cfg.forecast_scroll_up ? 10 : 0;
                 forecastSlideMs = now;
@@ -765,7 +857,7 @@ void displayReset() {
     }
     colonFrame = -1; colonFrameMs = 0; colonLastSec = -1;
     weatherMode = 0; weatherLastMs = 0;
-    weatherScrollX = 64; weatherScrollMs = 0;
+    weatherScrollX = DISPLAY_W; weatherScrollMs = 0;
     weatherScrollStr = "";
     forecastSlideY = 0; forecastSlideMs = 0;
     datLastMday = -1; datDirty = 2;  // Datum in beiden DMA-Buffern neu zeichnen
@@ -796,7 +888,7 @@ void displayUpdate(struct tm* t) {
     }
     if (clearModeBuf > 0) {
         clearModeBuf--;
-        dma_display->fillRect(0, 0, 64, DIGIT_H - 1, C_BLACK);  // Slot+Sekundenbalken leeren
+        dma_display->fillRect(0, 0, 64, _clockAreaHeight(), C_BLACK);
     }
 
     _setFlipTime(t->tm_hour, t->tm_min, t->tm_sec);
@@ -819,19 +911,19 @@ void displayUpdate(struct tm* t) {
     _drawFlipClock();
 
     // Sekundenbalken: immer neu (ändert sich jede Sekunde oder jeden Frame)
-    dma_display->fillRect(0, 10, 64, 2, C_BLACK);
+    dma_display->fillRect(0, _secondsBarY(), 64, 2, C_BLACK);
     _drawSeconds(t->tm_sec);
 
     // Datum: nur neu wenn geändert (Dirty-Counter auf Modulebene für displayReset())
     if (t->tm_mday != datLastMday) { datLastMday = t->tm_mday; datDirty = 2; }
     if (datDirty > 0) {
         datDirty--;
-        dma_display->fillRect(0, 13, 64, 7, C_BLACK);
-        _drawDate(t);
+        dma_display->fillRect(64, 0, 64, 21, C_BLACK);
+        _drawDateRight(t);
     }
 
     // Wetter-Zeile: immer neu (scrollt); ab y-2=21 damit Grossbuchstaben-Umlautpunkte (y-2) geloescht werden
-    dma_display->fillRect(0, 21, 64, 11, C_BLACK);
+    dma_display->fillRect(0, 21, DISPLAY_W, 11, C_BLACK);
     _drawWeatherLine();
 
     // AM/PM-Indikator nur im HH:MM-Modus

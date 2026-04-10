@@ -3,9 +3,9 @@
 Eine animierte Flip-Clock auf einem 64×32 HUB75 LED-Matrix-Display, betrieben von einem ESP32-S3.
 Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollständig über ein Browser-Webinterface konfigurierbar — kein Neu-Flashen notwendig.
 
-**Aktuelle Version:** 1.5.4
+**Aktuelle Version:** 1.6.0
 
-**Repository:** https://codeberg.org/diwou/hubby_seventy_five
+**Repository:** https://codeberg.org/diwou/Hubby_seventy_five
 
 **Lizenz:** CC BY-NC-SA 4.0, siehe [LICENSE](LICENSE)
 
