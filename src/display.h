@@ -155,7 +155,7 @@ void colorsInit() {
 // ============================================================
 #define DIGIT_W  10
 #define DIGIT_H  14
-static constexpr int DIGIT_VISIBLE_H_HHMM   = 13;
+static constexpr int DIGIT_VISIBLE_H_HHMM   = 15;
 static constexpr int DIGIT_VISIBLE_H_HHMMSS = 9;
 static constexpr char NARROW_SPACE_MARKER   = '\x1f';
 static constexpr int  NARROW_SPACE_PX       = 3;
@@ -204,7 +204,7 @@ static inline int _digitVisibleHeight() {
 }
 
 static inline int _secondsBarY() {
-    return (cfg.seconds_mode == 3) ? 10 : 15;
+    return (cfg.seconds_mode == 3) ? 10 : 18;
 }
 
 static inline int _clockAreaHeight() {
@@ -213,7 +213,7 @@ static inline int _clockAreaHeight() {
 
 static int _mapDigitRow(int row, int visibleH) {
     if (visibleH <= DIGIT_VISIBLE_H_HHMMSS) return row;
-    static const uint8_t scaledRows[DIGIT_VISIBLE_H_HHMM] = {1, 1, 2, 2, 3, 3, 4, 5, 6, 6, 7, 8, 8};
+    static const uint8_t scaledRows[DIGIT_VISIBLE_H_HHMM] = {1, 1, 1, 2, 2, 3, 3, 4, 5, 5, 6, 6, 7, 8, 8};
     return scaledRows[row];
 }
 
@@ -347,8 +347,8 @@ static void _drawFlipClock() {
         dma_display->fillRect(42, 7, 2, 2, cc);
     } else {
         // HH:MM: 2×2px Kolon-Punkte (je 3px Abstand zu den Zifferblöcken)
-        dma_display->fillRect(31, 3, 2, 2, cc);
-        dma_display->fillRect(31, 10, 2, 2, cc);
+        dma_display->fillRect(31, 4, 2, 2, cc);
+        dma_display->fillRect(31, 12, 2, 2, cc);
     }
 }
 
@@ -683,7 +683,7 @@ static void _drawForecastStatic(int idx, int yOff = 0) {
     int nightPx = strlen(nightBuf) * 6;
     int unitPx  = NARROW_SPACE_PX + 6;
     int dayNamePx = dayName.length() * 6;
-    int totalW  = dayNamePx + 6 + dayPx + unitPx + 6 + nightPx + unitPx;
+    int totalW  = dayNamePx + 6 + dayPx + unitPx + 18 + nightPx + unitPx;
     int x       = max(0, (DISPLAY_W - totalW) / 2);
     const int y = 23 + yOff;
 
@@ -697,8 +697,8 @@ static void _drawForecastStatic(int idx, int yOff = 0) {
 
     dma_display->setTextColor(C_INFO);
     dma_display->setCursor(x, y);
-    dma_display->print("/");
-    x += 6;
+    dma_display->print(" / ");
+    x += 18;
 
     x = _drawTempWithUnit(x, y, nightBuf, C_DATE, unit, C_INFO);
 }
