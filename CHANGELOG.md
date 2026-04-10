@@ -24,7 +24,7 @@ Ab `1.6.0` koennen pro Versionsblock zusaetzlich Codeberg-Referenzen gepflegt we
 - Scroll-Text in der Wetterzeile läuft jetzt über beide Panels (128 px Gesamtbreite)
 - Scrolltext des aktuellen Wetters beginnt jetzt mit `Aktuell:` und verwendet Temperaturangaben mit Abstand vor der Einheit, z. B. `+12.4 C`
 - Vorhersage-Kacheln zeigen jetzt 3-Buchstaben-Wochentage, Temperatur-Einheiten und Leerzeichen um den Trenner, z. B. `Fre +15 C / +3 C`
-- Uhrzeit links vertikal deutlich vergrößert; die HH:MM-Ziffern und der Doppelpunkt nutzen den frei gewordenen Platz oberhalb der Wetterzeile stärker aus
+- Uhrzeit links vertikal deutlich vergrößert; `HH:MM` nutzt jetzt ein eigenes 16px-hohes Rendering mit sichtbarer Zeilenverdopplung statt der bisherigen unveränderten Glyphenwirkung
 
 ## [1.5.4] — 2026-04-06
 

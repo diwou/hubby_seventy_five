@@ -155,7 +155,7 @@ void colorsInit() {
 // ============================================================
 #define DIGIT_W  10
 #define DIGIT_H  14
-static constexpr int DIGIT_VISIBLE_H_HHMM   = 15;
+static constexpr int DIGIT_VISIBLE_H_HHMM   = 16;
 static constexpr int DIGIT_VISIBLE_H_HHMMSS = 9;
 static constexpr char NARROW_SPACE_MARKER   = '\x1f';
 static constexpr int  NARROW_SPACE_PX       = 3;
@@ -204,7 +204,7 @@ static inline int _digitVisibleHeight() {
 }
 
 static inline int _secondsBarY() {
-    return (cfg.seconds_mode == 3) ? 10 : 18;
+    return (cfg.seconds_mode == 3) ? 10 : 19;
 }
 
 static inline int _clockAreaHeight() {
@@ -213,8 +213,7 @@ static inline int _clockAreaHeight() {
 
 static int _mapDigitRow(int row, int visibleH) {
     if (visibleH <= DIGIT_VISIBLE_H_HHMMSS) return row;
-    static const uint8_t scaledRows[DIGIT_VISIBLE_H_HHMM] = {1, 1, 1, 2, 2, 3, 3, 4, 5, 5, 6, 6, 7, 8, 8};
-    return scaledRows[row];
+    return 1 + min(7, row / 2);
 }
 
 static void _drawDigitAt(int x, int idx, int yOff, uint16_t color, int cols = DIGIT_W) {
@@ -347,8 +346,8 @@ static void _drawFlipClock() {
         dma_display->fillRect(42, 7, 2, 2, cc);
     } else {
         // HH:MM: 2×2px Kolon-Punkte (je 3px Abstand zu den Zifferblöcken)
-        dma_display->fillRect(31, 4, 2, 2, cc);
-        dma_display->fillRect(31, 12, 2, 2, cc);
+        dma_display->fillRect(31, 4, 2, 3, cc);
+        dma_display->fillRect(31, 11, 2, 3, cc);
     }
 }
 
