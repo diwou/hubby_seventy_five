@@ -11,7 +11,7 @@ Ab `1.6.0` koennen pro Versionsblock zusaetzlich Codeberg-Referenzen gepflegt we
 ## [1.6.0] - 2026-04-10
 
 ### Codeberg
-- Commit: `bdcf033` auf Branch `main`
+- Commit: `573a364` auf Branch `main`
 - Release-ID: folgt nach Test und expliziter Freigabe
 
 ### Added
