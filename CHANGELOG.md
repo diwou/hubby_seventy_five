@@ -25,6 +25,11 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Vorhersage-Kacheln zeigen jetzt 3-Buchstaben-Wochentage, Temperatur-Einheiten und Leerzeichen um den Trenner, z. B. `Fre +15 C / +3 C` [`573a364`]
 - Uhrzeit links vertikal deutlich vergrößert; nach dem verworfenen 7-Segment-Zwischenschritt nutzen die Zeitmodi jetzt hochskalierte Bitmap-Ziffern mit weicherem Look fuer `HH:MM` und `HH:MM:SS` [`a549f49`]
 - Beim Wechsel zwischen `HH:MM` und `HH:MM:SS` wird jetzt immer die maximale Uhrenflaeche geloescht, damit unterhalb der Zeit keine Fragmente des vorherigen Modus stehenbleiben [`4556f6d`]
+- In `HH:MM:SS` wird der alte Sekundenbalken-Bereich nicht mehr ueber die Ziffern geloescht; dadurch bleiben Zeile 11 und 12 nicht mehr leer [`5ce5838`]
+- Die `HH:MM:SS`-Anzeige wird 3 Pixelreihen tiefer gezeichnet, inklusive Doppelpunkt und Animationspfad; `HH:MM` bleibt unveraendert [`5ce5838`]
+- Vertikaler Clip-Bug in der Uhrdarstellung behoben: Der Zeichen-Clip beruecksichtigt jetzt auch den Y-Offset des aktiven Modus, damit unten keine Ziffernreihen mehr abgeschnitten werden [`5ce5838`]
+- Bitmap-Ziffern fuer `HH:MM:SS` unten optisch geglaettet: die untere Kante endet jetzt wie oben mit 2 statt 3 Pixelreihen [`5ce5838`]
+- OTA-Anzeige exklusiv gemacht: waehrend eines laufenden OTA-Updates blockiert ein eigener Display-Lock alle normalen Uhr-/Wetter-Redraws, damit nichts mehr in den Fortschrittsbildschirm hineinzeichnet und das Update stoert [`5ce5838`]
 
 ## [1.5.4] — 2026-04-06
 
