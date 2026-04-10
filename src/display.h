@@ -199,8 +199,10 @@ static const uint16_t _digits[11][14] PROGMEM = {
 // cols: Anzahl gezeichneter Spalten (DIGIT_W=10 oder 9 für HH:MM:SS)
 // Zeile 13 wird nie gezeichnet (Clip dy >= DIGIT_H-1) → 1px Gap
 // ============================================================
+static inline bool _useTallHHMM() { return cfg.seconds_mode != 3; }
+
 static inline int _digitVisibleHeight() {
-    return (cfg.seconds_mode == 3) ? DIGIT_VISIBLE_H_HHMMSS : DIGIT_VISIBLE_H_HHMM;
+    return _useTallHHMM() ? DIGIT_VISIBLE_H_HHMM : DIGIT_VISIBLE_H_HHMMSS;
 }
 
 static inline int _secondsBarY() {
@@ -211,23 +213,57 @@ static inline int _clockAreaHeight() {
     return (cfg.seconds_mode == 3) ? DIGIT_VISIBLE_H_HHMMSS : (_secondsBarY() + 2);
 }
 
-static int _mapDigitRow(int row, int visibleH) {
-    if (visibleH <= DIGIT_VISIBLE_H_HHMMSS) return row;
-    return 1 + min(7, row / 2);
+static inline void _fillDigitRectClipped(int x, int y, int w, int h, int yOff, int clipH, uint16_t color) {
+    int y0 = y + yOff;
+    int y1 = y0 + h;
+    if (y1 <= 0 || y0 >= clipH) return;
+    int drawY = max(0, y0);
+    int drawH = min(clipH, y1) - drawY;
+    if (drawH > 0) dma_display->fillRect(x, drawY, w, drawH, color);
 }
 
-static void _drawDigitAt(int x, int idx, int yOff, uint16_t color, int cols = DIGIT_W) {
+static void _drawDigitAtSmall(int x, int idx, int yOff, uint16_t color, int cols = DIGIT_W) {
     if (idx < 0 || idx > 10) return;
-    int visibleH = _digitVisibleHeight();
-    for (int row = 0; row < visibleH; row++) {
+    for (int row = 0; row < DIGIT_H; row++) {
         int dy = row + yOff;
-        if (dy < 0 || dy >= visibleH) continue;
-        uint16_t bits = pgm_read_word(&_digits[idx][_mapDigitRow(row, visibleH)]);
+        if (dy < 0 || dy >= DIGIT_VISIBLE_H_HHMMSS) continue;
+        uint16_t bits = pgm_read_word(&_digits[idx][row]);
         for (int col = 0; col < cols; col++) {
             if (bits & (1u << (DIGIT_W - 1 - col)))
                 dma_display->drawPixel(x + col, dy, color);
         }
     }
+}
+
+static void _drawDigitAtTall(int x, int idx, int yOff, uint16_t color) {
+    if (idx < 0 || idx > 10) return;
+    static const uint8_t segMask[11] = {
+        0x3F, // 0 = A B C D E F
+        0x06, // 1 = B C
+        0x5B, // 2 = A B D E G
+        0x4F, // 3 = A B C D G
+        0x66, // 4 = B C F G
+        0x6D, // 5 = A C D F G
+        0x7D, // 6 = A C D E F G
+        0x07, // 7 = A B C
+        0x7F, // 8 = A B C D E F G
+        0x6F, // 9 = A B C D F G
+        0x00  // blank
+    };
+
+    uint8_t mask = segMask[idx];
+    if (mask & 0x01) _fillDigitRectClipped(x + 1,  0, 8, 2, yOff, DIGIT_VISIBLE_H_HHMM, color); // A
+    if (mask & 0x02) _fillDigitRectClipped(x + 8,  2, 2, 5, yOff, DIGIT_VISIBLE_H_HHMM, color); // B
+    if (mask & 0x04) _fillDigitRectClipped(x + 8,  9, 2, 5, yOff, DIGIT_VISIBLE_H_HHMM, color); // C
+    if (mask & 0x08) _fillDigitRectClipped(x + 1, 14, 8, 2, yOff, DIGIT_VISIBLE_H_HHMM, color); // D
+    if (mask & 0x10) _fillDigitRectClipped(x + 0,  9, 2, 5, yOff, DIGIT_VISIBLE_H_HHMM, color); // E
+    if (mask & 0x20) _fillDigitRectClipped(x + 0,  2, 2, 5, yOff, DIGIT_VISIBLE_H_HHMM, color); // F
+    if (mask & 0x40) _fillDigitRectClipped(x + 1,  7, 8, 2, yOff, DIGIT_VISIBLE_H_HHMM, color); // G
+}
+
+static void _drawDigitAt(int x, int idx, int yOff, uint16_t color, int cols = DIGIT_W) {
+    if (_useTallHHMM()) _drawDigitAtTall(x, idx, yOff, color);
+    else _drawDigitAtSmall(x, idx, yOff, color, cols);
 }
 
 // ============================================================
@@ -347,7 +383,7 @@ static void _drawFlipClock() {
     } else {
         // HH:MM: 2×2px Kolon-Punkte (je 3px Abstand zu den Zifferblöcken)
         dma_display->fillRect(31, 4, 2, 3, cc);
-        dma_display->fillRect(31, 11, 2, 3, cc);
+        dma_display->fillRect(31, 10, 2, 3, cc);
     }
 }
 
