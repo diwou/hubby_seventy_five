@@ -8,6 +8,11 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ---
 
+## [Next]
+
+### Planned
+- Webinterface um eine Firmware-Update-Moeglichkeit direkt auf der Uhr erweitern [`uncommitted`]
+
 ## [1.6.0] - 2026-04-10
 
 ### Codeberg
@@ -30,7 +35,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Vertikaler Clip-Bug in der Uhrdarstellung behoben: Der Zeichen-Clip beruecksichtigt jetzt auch den Y-Offset des aktiven Modus, damit unten keine Ziffernreihen mehr abgeschnitten werden [`5ce5838`]
 - Bitmap-Ziffern fuer `HH:MM:SS` unten optisch geglaettet: die untere Kante endet jetzt wie oben mit 2 statt 3 Pixelreihen [`5ce5838`]
 - OTA-Anzeige exklusiv gemacht: waehrend eines laufenden OTA-Updates blockiert ein eigener Display-Lock alle normalen Uhr-/Wetter-Redraws, damit nichts mehr in den Fortschrittsbildschirm hineinzeichnet und das Update stoert [`5ce5838`]
-- README um einen manuellen Update-Abschnitt ohne Arduino IDE / ohne VS Code fuer Linux, macOS und Windows ergaenzt; ausserdem dokumentiert, dass der Browser-Installer ueber `Firmware/latest/manifest.json` bereits auf `1.6.0` zeigt [`uncommitted`]
+- README um einen manuellen Update-Abschnitt ohne Arduino IDE / ohne VS Code fuer Linux, macOS und Windows ergaenzt; ausserdem dokumentiert, dass der Browser-Installer ueber `Firmware/latest/manifest.json` bereits auf `1.6.0` zeigt [`c6aa33b`]
 
 ## [1.5.4] — 2026-04-06
 
