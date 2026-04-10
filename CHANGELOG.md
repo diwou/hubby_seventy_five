@@ -11,7 +11,8 @@ Ab `1.6.0` koennen pro Versionsblock zusaetzlich Codeberg-Referenzen gepflegt we
 ## [1.6.0] - 2026-04-10
 
 ### Codeberg
-- IDs/Referenzen: werden nach dem Anlegen von Release und zugehoerigen Eintraegen ergaenzt
+- Commit: `bdcf033` auf Branch `main`
+- Release-ID: folgt nach Test und expliziter Freigabe
 
 ### Added
 - Zweites HUB75-Panel als Daisy-Chain unterstützt (`DISPLAY_PANELS = 2`)
