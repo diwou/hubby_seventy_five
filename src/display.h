@@ -372,10 +372,10 @@ static void _drawFlipClock() {
         // HH:MM:SS: 2×2px Kolon-Punkte
         // C1=20..21 (gap=19 vor, gap=22 nach Kolon)
         // C2=41..42 (gap=40 vor, gap=43 nach Kolon)
-        dma_display->fillRect(21, 3 + _clockYOffset(), 2, 2, cc);
-        dma_display->fillRect(21, 9 + _clockYOffset(), 2, 2, cc);
-        dma_display->fillRect(42, 3 + _clockYOffset(), 2, 2, cc);
-        dma_display->fillRect(42, 9 + _clockYOffset(), 2, 2, cc);
+        dma_display->fillRect(20, 3 + _clockYOffset(), 2, 2, cc);
+        dma_display->fillRect(20, 9 + _clockYOffset(), 2, 2, cc);
+        dma_display->fillRect(41, 3 + _clockYOffset(), 2, 2, cc);
+        dma_display->fillRect(41, 9 + _clockYOffset(), 2, 2, cc);
     } else {
         // HH:MM: 2×2px Kolon-Punkte (je 3px Abstand zu den Zifferblöcken)
         dma_display->fillRect(31, 4 + _clockYOffset(), 2, 3, cc);

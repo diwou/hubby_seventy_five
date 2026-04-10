@@ -13,6 +13,9 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ### Added
 - Webinterface um eine Firmware-Update-Moeglichkeit direkt auf der Uhr erweitert: Im OTA-Tab kann jetzt eine `.bin`-Datei per Browser hochgeladen und direkt eingespielt werden; danach startet das Geraet automatisch neu [`0b8532a`]
 
+### Changed
+- `HH:MM:SS`-Doppelpunkte um 1 Pixel nach links verschoben, damit der seitliche Abstand zu den Ziffern ausgewogener wirkt [`uncommitted`]
+
 ## [1.6.0] - 2026-04-10
 
 ### Codeberg
