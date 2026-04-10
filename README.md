@@ -25,16 +25,17 @@ Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollstän
 2. [Hardware](#hardware)
 3. [Verkabelung / GPIO](#verkabelung--gpio)
 4. [Software-Setup (PlatformIO)](#software-setup-platformio)
-5. [Erstbetrieb](#erstbetrieb)
-6. [Webinterface](#webinterface)
-7. [Konfigurationsreferenz](#konfigurationsreferenz)
-8. [Display-Layout](#display-layout)
-9. [Animationsmodi](#animationsmodi)
-10. [Sekundenanzeige-Modi](#sekundenanzeige-modi)
-11. [REST-API](#rest-api)
-12. [Architektur / Code-Struktur](#architektur--code-struktur)
-13. [Changelog](#changelog)
-14. [Lizenz](#lizenz)
+5. [Manuelles Update Ohne IDE](#manuelles-update-ohne-ide)
+6. [Erstbetrieb](#erstbetrieb)
+7. [Webinterface](#webinterface)
+8. [Konfigurationsreferenz](#konfigurationsreferenz)
+9. [Display-Layout](#display-layout)
+10. [Animationsmodi](#animationsmodi)
+11. [Sekundenanzeige-Modi](#sekundenanzeige-modi)
+12. [REST-API](#rest-api)
+13. [Architektur / Code-Struktur](#architektur--code-struktur)
+14. [Changelog](#changelog)
+15. [Lizenz](#lizenz)
 
 ---
 
@@ -153,6 +154,68 @@ cd Hubby_seventy_five
 | `mathieucarbou/ESPAsyncWebServer` | ^3.3.0 | Asynchroner Webserver |
 | `mathieucarbou/AsyncTCP` | ^3.2.0 | Async-TCP-Unterbau |
 | `bblanchon/ArduinoJson` | ^7.2.0 | JSON (Config + OWM-API) |
+
+---
+
+## Manuelles Update Ohne IDE
+
+Wer weder die Arduino IDE noch VS Code mit PlatformIO nutzen moechte, kann die Dateien aus `Firmware/latest/` oder aus einer festen Version wie `Firmware/1.6.0/` direkt mit `esptool` flashen.
+
+Die vier relevanten Flash-Offets sind:
+
+```text
+0x0000   bootloader.bin
+0x8000   partitions.bin
+0xE000   boot_app0.bin
+0x10000  firmware.bin
+```
+
+Vorbereitung:
+- Geraet per USB anschliessen
+- Seriellen Port ermitteln
+- Falls noetig `esptool` installieren: `pip install esptool`
+
+### Linux
+
+USB-Port haeufig: `/dev/ttyACM0` oder `/dev/ttyUSB0`
+
+```bash
+esptool.py --chip esp32s3 --port /dev/ttyACM0 --baud 921600 --before default_reset --after hard_reset write_flash -z \
+  0x0000 Firmware/latest/bootloader.bin \
+  0x8000 Firmware/latest/partitions.bin \
+  0xE000 Firmware/latest/boot_app0.bin \
+  0x10000 Firmware/latest/firmware.bin
+```
+
+### macOS
+
+USB-Port haeufig: `/dev/cu.usbmodem...` oder `/dev/cu.usbserial...`
+
+```bash
+esptool.py --chip esp32s3 --port /dev/cu.usbmodemXXXX --baud 921600 --before default_reset --after hard_reset write_flash -z \
+  0x0000 Firmware/latest/bootloader.bin \
+  0x8000 Firmware/latest/partitions.bin \
+  0xE000 Firmware/latest/boot_app0.bin \
+  0x10000 Firmware/latest/firmware.bin
+```
+
+### Windows
+
+USB-Port haeufig: `COM3`, `COM4`, `COM5`, ...
+
+```powershell
+esptool.py --chip esp32s3 --port COM4 --baud 921600 --before default_reset --after hard_reset write_flash -z `
+  0x0000 Firmware/latest/bootloader.bin `
+  0x8000 Firmware/latest/partitions.bin `
+  0xE000 Firmware/latest/boot_app0.bin `
+  0x10000 Firmware/latest/firmware.bin
+```
+
+Hinweise:
+- Wenn `esptool.py` nicht gefunden wird, klappt oft auch `python -m esptool`.
+- Bei einer festen Release-Version statt `Firmware/latest/` einfach z. B. `Firmware/1.6.0/` verwenden.
+- Wer gar nichts lokal installieren moechte, kann alternativ weiter den Browser-Installer nutzen.
+- Der Browser-Installer ist bereits auf dem aktuellen Stand: `Firmware/latest/manifest.json` zeigt derzeit auf Version `1.6.0`.
 
 ---
 
