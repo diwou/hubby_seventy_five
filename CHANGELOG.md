@@ -11,7 +11,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ## [1.6.0] - 2026-04-10
 
 ### Codeberg
-- Release-ID: folgt nach Test und expliziter Freigabe
+- Release-ID: `8429130` (`v1.6.0`)
 
 ### Added
 - Zweites HUB75-Panel als Daisy-Chain unterstützt (`DISPLAY_PANELS = 2`) [`bdcf033`]
