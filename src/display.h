@@ -217,55 +217,40 @@ static inline int _maxClockAreaHeight() {
     return DIGIT_VISIBLE_H_HHMM + 5;
 }
 
-static inline void _fillDigitRectClipped(int x, int y, int w, int h, int yOff, int clipH, uint16_t color) {
-    int y0 = y + yOff;
-    int y1 = y0 + h;
-    if (y1 <= 0 || y0 >= clipH) return;
-    int drawY = max(0, y0);
-    int drawH = min(clipH, y1) - drawY;
-    if (drawH > 0) dma_display->fillRect(x, drawY, w, drawH, color);
-}
-
 static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
     if (idx < 0 || idx > 10) return;
-    static const uint8_t segMask[11] = {
-        0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F, 0x00
+    static const uint8_t rowMap[DIGIT_VISIBLE_H_HHMMSS] = {
+        1, 1, 2, 2, 3, 4, 4, 5, 6, 6, 7, 8, 8, 8
     };
-
-    uint8_t mask = segMask[idx];
-    if (mask & 0x01) _fillDigitRectClipped(x + 1,  0, 6, 2, yOff, DIGIT_VISIBLE_H_HHMMSS, color); // A
-    if (mask & 0x02) _fillDigitRectClipped(x + 6,  2, 2, 4, yOff, DIGIT_VISIBLE_H_HHMMSS, color); // B
-    if (mask & 0x04) _fillDigitRectClipped(x + 6,  8, 2, 4, yOff, DIGIT_VISIBLE_H_HHMMSS, color); // C
-    if (mask & 0x08) _fillDigitRectClipped(x + 1, 12, 6, 2, yOff, DIGIT_VISIBLE_H_HHMMSS, color); // D
-    if (mask & 0x10) _fillDigitRectClipped(x + 0,  8, 2, 4, yOff, DIGIT_VISIBLE_H_HHMMSS, color); // E
-    if (mask & 0x20) _fillDigitRectClipped(x + 0,  2, 2, 4, yOff, DIGIT_VISIBLE_H_HHMMSS, color); // F
-    if (mask & 0x40) _fillDigitRectClipped(x + 1,  6, 6, 2, yOff, DIGIT_VISIBLE_H_HHMMSS, color); // G
+    for (int row = 0; row < DIGIT_VISIBLE_H_HHMMSS; row++) {
+        int dy = row + yOff;
+        if (dy < 0 || dy >= DIGIT_VISIBLE_H_HHMMSS) continue;
+        uint16_t bits = pgm_read_word(&_digits[idx][rowMap[row]]);
+        uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);  // mittlere 8 Spalten
+        for (int col = 0; col < 8; col++) {
+            if (compactBits & (1u << (7 - col)))
+                dma_display->drawPixel(x + col, dy, color);
+        }
+    }
 }
 
 static void _drawDigitAtTall(int x, int idx, int yOff, uint16_t color) {
     if (idx < 0 || idx > 10) return;
-    static const uint8_t segMask[11] = {
-        0x3F, // 0 = A B C D E F
-        0x06, // 1 = B C
-        0x5B, // 2 = A B D E G
-        0x4F, // 3 = A B C D G
-        0x66, // 4 = B C F G
-        0x6D, // 5 = A C D F G
-        0x7D, // 6 = A C D E F G
-        0x07, // 7 = A B C
-        0x7F, // 8 = A B C D E F G
-        0x6F, // 9 = A B C D F G
-        0x00  // blank
+    static const uint8_t rowMap[DIGIT_VISIBLE_H_HHMM] = {
+        1, 1, 2, 2, 3, 3, 4, 4,
+        5, 5, 6, 6, 7, 7, 8, 8
     };
-
-    uint8_t mask = segMask[idx];
-    if (mask & 0x01) _fillDigitRectClipped(x + 1,  0, 8, 2, yOff, DIGIT_VISIBLE_H_HHMM, color); // A
-    if (mask & 0x02) _fillDigitRectClipped(x + 8,  2, 2, 5, yOff, DIGIT_VISIBLE_H_HHMM, color); // B
-    if (mask & 0x04) _fillDigitRectClipped(x + 8,  9, 2, 5, yOff, DIGIT_VISIBLE_H_HHMM, color); // C
-    if (mask & 0x08) _fillDigitRectClipped(x + 1, 14, 8, 2, yOff, DIGIT_VISIBLE_H_HHMM, color); // D
-    if (mask & 0x10) _fillDigitRectClipped(x + 0,  9, 2, 5, yOff, DIGIT_VISIBLE_H_HHMM, color); // E
-    if (mask & 0x20) _fillDigitRectClipped(x + 0,  2, 2, 5, yOff, DIGIT_VISIBLE_H_HHMM, color); // F
-    if (mask & 0x40) _fillDigitRectClipped(x + 1,  7, 8, 2, yOff, DIGIT_VISIBLE_H_HHMM, color); // G
+    for (int row = 0; row < DIGIT_VISIBLE_H_HHMM; row++) {
+        int dy = row + yOff;
+        if (dy < 0 || dy >= DIGIT_VISIBLE_H_HHMM) continue;
+        uint16_t bits = pgm_read_word(&_digits[idx][rowMap[row]]);
+        bits |= (bits >> 1);           // leicht verbreitern
+        bits &= 0x1FE;                 // innerhalb der 10 Spalten halten
+        for (int col = 0; col < DIGIT_W; col++) {
+            if (bits & (1u << (DIGIT_W - 1 - col)))
+                dma_display->drawPixel(x + col, dy, color);
+        }
+    }
 }
 
 static void _drawDigitAt(int x, int idx, int yOff, uint16_t color, int cols = DIGIT_W) {
