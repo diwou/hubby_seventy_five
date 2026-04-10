@@ -28,6 +28,7 @@ extern uint32_t lastWeatherFetch;
 
 // Forward-Deklarationen (definiert in display.h)
 void displayShowOTA(uint32_t progress, uint32_t total);
+void displaySetOtaActive(bool active);
 void colorsInit();
 void displaySetBrightness(uint8_t brightness);
 
@@ -624,12 +625,16 @@ void otaSetup() {
     }
     ArduinoOTA.onStart([]() {
         otaRunning = true;
+        displaySetOtaActive(true);
         displayShowOTA(0, 1);
     });
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
         displayShowOTA((uint32_t)progress, (uint32_t)total);
     });
     ArduinoOTA.onEnd([]()   { otaRunning = false; });
-    ArduinoOTA.onError([](ota_error_t) { otaRunning = false; });
+    ArduinoOTA.onError([](ota_error_t) {
+        otaRunning = false;
+        displaySetOtaActive(false);
+    });
     ArduinoOTA.begin();
 }

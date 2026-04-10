@@ -217,14 +217,19 @@ static inline int _maxClockAreaHeight() {
     return DIGIT_VISIBLE_H_HHMM + 5;
 }
 
+static inline int _clockYOffset() {
+    return (cfg.seconds_mode == 3) ? 3 : 0;
+}
+
 static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
     if (idx < 0 || idx > 10) return;
+    int clipH = DIGIT_VISIBLE_H_HHMMSS + _clockYOffset();
     static const uint8_t rowMap[DIGIT_VISIBLE_H_HHMMSS] = {
-        1, 1, 2, 2, 3, 4, 4, 5, 6, 6, 7, 8, 8, 8
+        1, 1, 2, 2, 3, 4, 4, 5, 6, 6, 7, 7, 8, 8
     };
     for (int row = 0; row < DIGIT_VISIBLE_H_HHMMSS; row++) {
         int dy = row + yOff;
-        if (dy < 0 || dy >= DIGIT_VISIBLE_H_HHMMSS) continue;
+        if (dy < 0 || dy >= clipH) continue;
         uint16_t bits = pgm_read_word(&_digits[idx][rowMap[row]]);
         uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);  // mittlere 8 Spalten
         for (int col = 0; col < 8; col++) {
@@ -236,13 +241,14 @@ static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
 
 static void _drawDigitAtTall(int x, int idx, int yOff, uint16_t color) {
     if (idx < 0 || idx > 10) return;
+    int clipH = DIGIT_VISIBLE_H_HHMM + _clockYOffset();
     static const uint8_t rowMap[DIGIT_VISIBLE_H_HHMM] = {
         1, 1, 2, 2, 3, 3, 4, 4,
         5, 5, 6, 6, 7, 7, 8, 8
     };
     for (int row = 0; row < DIGIT_VISIBLE_H_HHMM; row++) {
         int dy = row + yOff;
-        if (dy < 0 || dy >= DIGIT_VISIBLE_H_HHMM) continue;
+        if (dy < 0 || dy >= clipH) continue;
         uint16_t bits = pgm_read_word(&_digits[idx][rowMap[row]]);
         bits |= (bits >> 1);           // leicht verbreitern
         bits &= 0x1FE;                 // innerhalb der 10 Spalten halten
@@ -285,26 +291,24 @@ static void _drawClockDigit(int x, const FlipDigit& d, int cols) {
     int ci = (d.cur    == ' ') ? 10 : (d.cur    - '0');
     int ti = (d.target == ' ') ? 10 : (d.target - '0');
     int visibleH = _digitVisibleHeight();
+    int baseY = _clockYOffset();
 
-    // Slot schwarz löschen (nur diesen Slot, Zifferninhalt ist in y=0..8)
-    dma_display->fillRect(x, 0, cols, visibleH, C_BLACK);
+    // Slot schwarz löschen inklusive vertikalem Offset.
+    dma_display->fillRect(x, 0, cols, visibleH + baseY, C_BLACK);
 
     if (d.frame < 0) {
-        _drawDigitAt(x, ci, 0, C_DIGIT, cols);
+        _drawDigitAt(x, ci, baseY, C_DIGIT, cols);
     } else if (cfg.anim_mode == 0) {
-        // Slide-Up: Phase 1 (0-8) alte raus, Phase 2 (9-16) neue rein, je 1px/Frame.
-        // Clip in _drawDigitAt bei dy>=9 → Animation strikt innerhalb y=0..8.
-        // Frame 8: letzte Ziffer (Row 8) bei dy=0; Frame 9: neue (Row 1) bei dy=8 — kein Gap.
         if (d.frame <= visibleH - 1)
-            _drawDigitAt(x, ci, -d.frame,     C_DIGIT, cols);
+            _drawDigitAt(x, ci, baseY - d.frame, C_DIGIT, cols);
         else
-            _drawDigitAt(x, ti, (visibleH * 2 - 2) - d.frame, C_DIGIT, cols);
+            _drawDigitAt(x, ti, baseY + (visibleH * 2 - 2) - d.frame, C_DIGIT, cols);
     } else {
         // Cross-Dissolve
         if (d.frame <= 6)
-            _drawDigitAt(x, ci, 0, C_DIGIT_FADE[d.frame],      cols);
+            _drawDigitAt(x, ci, baseY, C_DIGIT_FADE[d.frame],      cols);
         else
-            _drawDigitAt(x, ti, 0, C_DIGIT_FADE[13 - d.frame], cols);
+            _drawDigitAt(x, ti, baseY, C_DIGIT_FADE[13 - d.frame], cols);
     }
 }
 
@@ -368,14 +372,14 @@ static void _drawFlipClock() {
         // HH:MM:SS: 2×2px Kolon-Punkte
         // C1=20..21 (gap=19 vor, gap=22 nach Kolon)
         // C2=41..42 (gap=40 vor, gap=43 nach Kolon)
-        dma_display->fillRect(21, 3, 2, 2, cc);
-        dma_display->fillRect(21, 9, 2, 2, cc);
-        dma_display->fillRect(42, 3, 2, 2, cc);
-        dma_display->fillRect(42, 9, 2, 2, cc);
+        dma_display->fillRect(21, 3 + _clockYOffset(), 2, 2, cc);
+        dma_display->fillRect(21, 9 + _clockYOffset(), 2, 2, cc);
+        dma_display->fillRect(42, 3 + _clockYOffset(), 2, 2, cc);
+        dma_display->fillRect(42, 9 + _clockYOffset(), 2, 2, cc);
     } else {
         // HH:MM: 2×2px Kolon-Punkte (je 3px Abstand zu den Zifferblöcken)
-        dma_display->fillRect(31, 4, 2, 3, cc);
-        dma_display->fillRect(31, 10, 2, 3, cc);
+        dma_display->fillRect(31, 4 + _clockYOffset(), 2, 3, cc);
+        dma_display->fillRect(31, 10 + _clockYOffset(), 2, 3, cc);
     }
 }
 
@@ -606,6 +610,7 @@ static uint32_t  forecastSlideMs  = 0;
 // Datum-Dirty-Counter auf Modulebene, damit displayReset() ihn zurücksetzen kann
 static int       datLastMday  = -1;
 static uint8_t   datDirty     = 2;
+static bool      displayOtaActive = false;
 
 // ============================================================
 // Umlaut-fähige Text-Ausgabe (ersetzt dma_display->print für
@@ -803,7 +808,12 @@ static void _drawWeatherLine() {
 // ============================================================
 // OTA-Fortschrittsanzeige
 // ============================================================
+void displaySetOtaActive(bool active) {
+    displayOtaActive = active;
+}
+
 void displayShowOTA(uint32_t progress, uint32_t total) {
+    displayOtaActive = true;
     dma_display->clearScreen();
     dma_display->setTextSize(1);
     dma_display->setTextColor(C_WARN);
@@ -878,6 +888,7 @@ void displayShowMessage(const String& msg, uint16_t color) {
 // RAM-Überbleibsel aus dem Vorstart zu Ghosting führt.
 // ============================================================
 void displayReset() {
+    displayOtaActive = false;
     for (int i = 0; i < 6; i++) {
         flip[i] = FlipDigit();
         digitDirty[i] = 2;
@@ -898,6 +909,8 @@ void displayReset() {
 // damit statische Ziffern nie flackern.
 // ============================================================
 void displayUpdate(struct tm* t) {
+    if (displayOtaActive) return;
+
     // Bei Wechsel des seconds_mode: gesamten Ziffernbereich in BEIDEN DMA-Buffern leeren.
     // clearModeBuf=2 sorgt dafür, dass fillRect in den nächsten 2 Frames ausgeführt wird
     // (je einer pro Buffer), damit keine Geisterpixel des alten Layouts übrigbleiben.
@@ -937,9 +950,11 @@ void displayUpdate(struct tm* t) {
     // Uhr-Ziffern: nur Geänderte/Animierende werden neu gezeichnet
     _drawFlipClock();
 
-    // Sekundenbalken: immer neu (ändert sich jede Sekunde oder jeden Frame)
-    dma_display->fillRect(0, _secondsBarY(), 64, 2, C_BLACK);
-    _drawSeconds(t->tm_sec);
+    // Sekundenbalken nur in Mode 0-2 neu zeichnen; bei HH:MM:SS liegen dort Ziffernpixel.
+    if (cfg.seconds_mode != 3) {
+        dma_display->fillRect(0, _secondsBarY(), 64, 2, C_BLACK);
+        _drawSeconds(t->tm_sec);
+    }
 
     // Datum: nur neu wenn geändert (Dirty-Counter auf Modulebene für displayReset())
     if (t->tm_mday != datLastMday) { datLastMday = t->tm_mday; datDirty = 2; }
