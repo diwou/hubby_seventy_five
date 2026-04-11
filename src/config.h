@@ -47,6 +47,9 @@ struct Config {
     uint8_t anim_mode         = 0;       // 0=Slide-Up, 1=Cross-Dissolve
     uint8_t seconds_mode      = 0;       // 0=Bar, 1=Pulse, 2=Dots, 3=HH:MM:SS
     bool    forecast_scroll_up = true;   // Vorhersage-Kacheln von unten einscrollen
+    uint8_t display_panel_cols = 2;      // aktuell im Web-UI: 1 oder 2 Panels nebeneinander
+    uint8_t display_panel_rows = 1;      // Vorbereitung fuer spaeteres 2x2-Layout
+    uint8_t display_panel_map  = 0;      // 0=linear, 1=zigzag/serpentine (fuer spaeteres 2x2)
 
     // Farben (hex #RRGGBB)
     String  color_digit     = "#FFC832";   // Ziffern Gold/Amber
@@ -105,6 +108,14 @@ bool configLoad() {
     cfg.anim_mode         = doc["anim_mode"]         | 0;
     cfg.seconds_mode      = doc["seconds_mode"]      | 0;
     cfg.forecast_scroll_up = doc["forecast_scroll_up"] | true;
+    cfg.display_panel_cols = doc["display_panel_cols"] | 2;
+    cfg.display_panel_rows = doc["display_panel_rows"] | 1;
+    cfg.display_panel_map  = doc["display_panel_map"]  | 0;
+    if (cfg.display_panel_cols < 1) cfg.display_panel_cols = 1;
+    if (cfg.display_panel_cols > 2) cfg.display_panel_cols = 2;
+    if (cfg.display_panel_rows < 1) cfg.display_panel_rows = 1;
+    if (cfg.display_panel_rows > 1) cfg.display_panel_rows = 1; // 2x2 ist vorbereitet, aber noch nicht aktiv
+    if (cfg.display_panel_map > 1) cfg.display_panel_map = 0;
     cfg.ota_enabled       = doc["ota_enabled"]       | true;
     cfg.ota_password      = doc["ota_password"]      | "";
     cfg.wifi_timeout_sec  = doc["wifi_timeout_sec"]  | 30;
@@ -148,6 +159,9 @@ bool configSave() {
     doc["anim_mode"]           = cfg.anim_mode;
     doc["seconds_mode"]        = cfg.seconds_mode;
     doc["forecast_scroll_up"]  = cfg.forecast_scroll_up;
+    doc["display_panel_cols"]  = cfg.display_panel_cols;
+    doc["display_panel_rows"]  = cfg.display_panel_rows;
+    doc["display_panel_map"]   = cfg.display_panel_map;
     doc["ota_enabled"]         = cfg.ota_enabled;
     doc["ota_password"]     = cfg.ota_password;
     doc["wifi_timeout_sec"] = cfg.wifi_timeout_sec;

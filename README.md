@@ -1,6 +1,6 @@
 # HUB75 NTP Flip Clock
 
-Eine animierte Flip-Clock auf einem 64×32 HUB75 LED-Matrix-Display, betrieben von einem ESP32-S3.
+Eine animierte Flip-Clock auf einem oder zwei 64×32 HUB75 LED-Matrix-Displays, betrieben von einem ESP32-S3.
 Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollständig über ein Browser-Webinterface konfigurierbar — kein Neu-Flashen notwendig.
 
 **Aktuelle Version:** 1.6.0
@@ -46,6 +46,7 @@ Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollstän
 - **Wetteranzeige** — aktuelles Wetter + 3-Tage-Vorhersage via OpenWeatherMap API
 - **Captive Portal** — bei fehlendem WLAN öffnet sich automatisch ein Konfigurations-Hotspot
 - **Webinterface** — vollständige Konfiguration im Browser unter `http://hub75clock.local`
+- **Umschaltbares Panel-Layout** — 1× HUB75 oder 2× HUB75 nebeneinander, mit vorbereiteter Mapping-Struktur für spätere 2×2-Layouts
 - **OTA-Updates** — Firmware-Update über WLAN (ArduinoOTA)
 - **Konfigurierbare Farben** — 8 Farbwähler für alle Display-Elemente
 - **Mehrere Anzeigemodi** — 12h/24h, 4 Datumsformate, 4 Sekundenanzeige-Varianten
@@ -59,7 +60,7 @@ Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollstän
 | Komponente | Beschreibung |
 |---|---|
 | **Mikrocontroller** | Freenove ESP32-S3 WROOM N16R8 (16 MB Flash, 8 MB PSRAM) |
-| **Display** | 64×32 HUB75 RGB LED-Matrix, 1 Panel |
+| **Display** | 64×32 HUB75 RGB LED-Matrix, 1 oder 2 Panels nebeneinander |
 | **Pegelwandler** | 74HCT245 (3,3 V → 5 V für HUB75-Signale) |
 
 ---
@@ -284,6 +285,7 @@ Schaltflächen: **Aktualisieren**, **Neustart**, **Factory Reset**
 
 ### Anzeige
 - Helligkeit (0–255)
+- HUB75-Layout: `1x HUB75 (64x32)` oder `2x HUB75 nebeneinander (128x32)`
 - Sprache: Deutsch / Englisch (Wochentage, Wetterbeschreibungen)
 - Zeitformat: 24h oder 12h (AM/PM-Indikator)
 - Datumsformat: 4 Varianten (siehe [Konfigurationsreferenz](#konfigurationsreferenz))
@@ -292,6 +294,8 @@ Schaltflächen: **Aktualisieren**, **Neustart**, **Factory Reset**
 - Wetter-Wechselintervall (untere Zeile, Standard: 6 s)
 - Scroll-Geschwindigkeit (30 = schnell, 200 = langsam, Standard: 80 ms/Pixel)
 - **Farben:** 8 Farbwähler für alle Display-Elemente
+
+Änderungen am HUB75-Layout werden erst nach einem Neustart aktiv, weil die Matrix-DMA-Konfiguration beim Booten initialisiert wird.
 
 ### OTA
 - OTA-Updates aktivieren / deaktivieren
@@ -354,6 +358,9 @@ Alle Einstellungen werden in `/cfg.json` auf dem LittleFS-Dateisystem gespeicher
 | `date_format` | `0` | Datumsformat (0–3, siehe unten) |
 | `anim_mode` | `0` | `0` = Slide-Up, `1` = Cross-Dissolve |
 | `seconds_mode` | `0` | `0` = Bar, `1` = Pulse, `2` = Dots, `3` = HH:MM:SS |
+| `display_panel_cols` | `2` | Aktuell unterstützt: `1` = ein Panel, `2` = zwei Panels nebeneinander |
+| `display_panel_rows` | `1` | Vorbereitung für späteres 2×2-Layout; derzeit im Webinterface fest auf `1` |
+| `display_panel_map` | `0` | Vorbereitung für Mapping-Modi: `0` = linear, `1` = ZigZag/Serpentine; derzeit noch nicht im Webinterface auswählbar |
 | `bottom_cycle_sec` | `6` | Wechselintervall der Wetterzeile in Sekunden |
 | `scroll_speed_ms` | `80` | Scroll-Geschwindigkeit in ms pro Pixel (30–200) |
 
@@ -392,7 +399,18 @@ Alle Farben im Format `#RRGGBB`:
 
 ## Display-Layout
 
-Das 64×32-Pixel-Display ist in vier Bereiche aufgeteilt:
+Die Firmware kann aktuell mit einem oder zwei 64×32-HUB75-Panels betrieben werden:
+
+| Einstellung | Virtuelle Größe | Verhalten |
+|---|---:|---|
+| `1x HUB75` | 64×32 px | Uhr, Datum und Wetter laufen wie im klassischen Ein-Panel-Layout auf einem Panel |
+| `2x HUB75 nebeneinander` | 128×32 px | Uhr bleibt links, Datum nutzt das rechte Panel, die Wetterzeile scrollt über die volle Breite |
+
+Die Konfiguration speichert bereits `display_panel_cols`, `display_panel_rows` und `display_panel_map`. Dadurch ist die Struktur für ein späteres 2×2-Layout vorbereitet. Für 2×2 muss zusätzlich das physische Panel-Mapping implementiert werden, z. B. linear oder ZigZag/Serpentine passend zur Verkabelung.
+
+Bei `1x HUB75` verwendet `HH:MM:SS` bewusst das kompakte Ein-Panel-Layout aus Version `1.5.4`, damit die sechs Ziffern auf 64×32 px nicht zu groß dargestellt werden. Bei `2x HUB75 nebeneinander` bleibt das größere aktuelle Layout aktiv.
+
+Das 64×32-Basislayout ist in vier Bereiche aufgeteilt:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐ y=0
@@ -487,6 +505,11 @@ Das Webinterface kommuniziert über eine interne JSON-API. Alle Endpunkte sind u
 curl -X POST http://hub75clock.local/api/config \
   -H "Content-Type: application/json" \
   -d '{"brightness": 150}'
+
+# Auf ein einzelnes HUB75-Panel umstellen; Neustart danach erforderlich
+curl -X POST http://hub75clock.local/api/config \
+  -H "Content-Type: application/json" \
+  -d '{"display_panel_cols": 1, "display_panel_rows": 1}'
 
 # Aktuellen Status abrufen
 curl http://hub75clock.local/api/status

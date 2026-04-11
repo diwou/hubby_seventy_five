@@ -27,8 +27,32 @@ static constexpr int PIN_OE  = 18;
 }
 
 static constexpr uint8_t DISPLAY_BOOT_BRIGHTNESS = 4;
-static constexpr int     DISPLAY_PANELS = 2;            // Anzahl verketteter HUB75-Panels
-static constexpr int     DISPLAY_W      = 64 * DISPLAY_PANELS;  // Virtuelle Breite in Pixel
+static constexpr int     PANEL_W = 64;
+static constexpr int     PANEL_H = 32;
+
+static uint8_t displayPanelColumns() {
+    return (cfg.display_panel_cols < 1) ? 1 : ((cfg.display_panel_cols > 2) ? 2 : cfg.display_panel_cols);
+}
+
+static uint8_t displayPanelRows() {
+    // Die Konfiguration ist bereits fuer 2x2 vorbereitet. Die aktuelle Matrix-
+    // Initialisierung unterstuetzt bewusst nur eine Panel-Zeile; das Web-UI
+    // bietet deshalb vorerst nur 1x1 und 2x1 an.
+    (void)cfg.display_panel_rows;
+    return 1;
+}
+
+static uint8_t displayPanelMapping() {
+    return (cfg.display_panel_map > 1) ? 0 : cfg.display_panel_map;
+}
+
+static int displayPanelCount() { return displayPanelColumns() * displayPanelRows(); }
+static int displayWidth() { return PANEL_W * displayPanelColumns(); }
+static int displayHeight() { return PANEL_H * displayPanelRows(); }
+
+#define DISPLAY_PANELS (displayPanelCount())
+#define DISPLAY_W      (displayWidth())
+#define DISPLAY_H      (displayHeight())
 
 static void displayPreparePins() {
     const int pins[] = {
@@ -85,8 +109,9 @@ void displayInit() {
         DisplayPins::PIN_LAT, DisplayPins::PIN_OE, DisplayPins::PIN_CLK
     };
     // double_buff=false: mit 2 Panels reicht der DMA-Speicher (internes SRAM) nicht fuer double buffering
-    HUB75_I2S_CFG mxconfig(64, 32, DISPLAY_PANELS, pinmap, HUB75_I2S_CFG::FM6126A,
+    HUB75_I2S_CFG mxconfig(PANEL_W, PANEL_H, DISPLAY_PANELS, pinmap, HUB75_I2S_CFG::FM6126A,
                            HUB75_I2S_CFG::TYPE138, false);
+    (void)displayPanelMapping(); // vorbereitet fuer spaetere 2x2-/ZigZag-Mapping-Unterstuetzung
 
     dma_display = new MatrixPanel_I2S_DMA(mxconfig);
     dma_display->begin();
@@ -199,9 +224,14 @@ static const uint16_t _digits[11][14] PROGMEM = {
 // cols: Anzahl gezeichneter Spalten (DIGIT_W=10 oder 9 für HH:MM:SS)
 // Zeile 13 wird nie gezeichnet (Clip dy >= DIGIT_H-1) → 1px Gap
 // ============================================================
+static inline bool _useLegacySinglePanelHHMMSS() {
+    return cfg.seconds_mode == 3 && DISPLAY_W < 128;
+}
+
 static inline bool _useTallHHMM() { return cfg.seconds_mode != 3; }
 
 static inline int _digitVisibleHeight() {
+    if (_useLegacySinglePanelHHMMSS()) return 9;
     return _useTallHHMM() ? DIGIT_VISIBLE_H_HHMM : DIGIT_VISIBLE_H_HHMMSS;
 }
 
@@ -218,11 +248,26 @@ static inline int _maxClockAreaHeight() {
 }
 
 static inline int _clockYOffset() {
+    if (_useLegacySinglePanelHHMMSS()) return 0;
     return (cfg.seconds_mode == 3) ? 3 : 0;
 }
 
 static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
     if (idx < 0 || idx > 10) return;
+    if (_useLegacySinglePanelHHMMSS()) {
+        for (int row = 0; row < DIGIT_H; row++) {
+            int dy = row + yOff;
+            if (dy < 0 || dy >= 9) continue;
+            uint16_t bits = pgm_read_word(&_digits[idx][row]);
+            uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);
+            for (int col = 0; col < 8; col++) {
+                if (compactBits & (1u << (7 - col)))
+                    dma_display->drawPixel(x + col, dy, color);
+            }
+        }
+        return;
+    }
+
     int clipH = DIGIT_VISIBLE_H_HHMMSS + _clockYOffset();
     static const uint8_t rowMap[DIGIT_VISIBLE_H_HHMMSS] = {
         1, 1, 2, 2, 3, 4, 4, 5, 6, 6, 7, 7, 8, 8
@@ -372,10 +417,17 @@ static void _drawFlipClock() {
         // HH:MM:SS: 2×2px Kolon-Punkte
         // C1=20..21 (gap=19 vor, gap=22 nach Kolon)
         // C2=41..42 (gap=40 vor, gap=43 nach Kolon)
-        dma_display->fillRect(20, 3 + _clockYOffset(), 2, 2, cc);
-        dma_display->fillRect(20, 9 + _clockYOffset(), 2, 2, cc);
-        dma_display->fillRect(41, 3 + _clockYOffset(), 2, 2, cc);
-        dma_display->fillRect(41, 9 + _clockYOffset(), 2, 2, cc);
+        if (_useLegacySinglePanelHHMMSS()) {
+            dma_display->fillRect(21, 2, 2, 2, cc);
+            dma_display->fillRect(21, 7, 2, 2, cc);
+            dma_display->fillRect(42, 2, 2, 2, cc);
+            dma_display->fillRect(42, 7, 2, 2, cc);
+        } else {
+            dma_display->fillRect(20, 3 + _clockYOffset(), 2, 2, cc);
+            dma_display->fillRect(20, 9 + _clockYOffset(), 2, 2, cc);
+            dma_display->fillRect(41, 3 + _clockYOffset(), 2, 2, cc);
+            dma_display->fillRect(41, 9 + _clockYOffset(), 2, 2, cc);
+        }
     } else {
         // HH:MM: 2×2px Kolon-Punkte (je 3px Abstand zu den Zifferblöcken)
         dma_display->fillRect(31, 4 + _clockYOffset(), 2, 3, cc);
@@ -842,7 +894,7 @@ void displayShowOTA(uint32_t progress, uint32_t total) {
 // ============================================================
 void displayScrollText(const String& text, uint16_t color, int speed_ms) {
     int pixelLen = text.length() * 6;
-    for (int x = 64; x > -(pixelLen); x--) {
+    for (int x = DISPLAY_W; x > -(pixelLen); x--) {
         dma_display->clearScreen();
         dma_display->setTextSize(1);
         dma_display->setTextColor(C_DATE);
@@ -875,7 +927,7 @@ void displayShowAP(const String& ssid, const String& ip) {
 }
 
 void displayShowMessage(const String& msg, uint16_t color) {
-    dma_display->fillRect(0, 11, 64, 21, C_BLACK);
+    dma_display->fillRect(0, 11, DISPLAY_W, 21, C_BLACK);
     dma_display->setTextSize(1);
     dma_display->setTextColor(color);
     dma_display->setCursor(0, 23);
@@ -960,8 +1012,13 @@ void displayUpdate(struct tm* t) {
     if (t->tm_mday != datLastMday) { datLastMday = t->tm_mday; datDirty = 2; }
     if (datDirty > 0) {
         datDirty--;
-        dma_display->fillRect(64, 0, 64, 21, C_BLACK);
-        _drawDateRight(t);
+        if (DISPLAY_W >= 128) {
+            dma_display->fillRect(64, 0, 64, 21, C_BLACK);
+            _drawDateRight(t);
+        } else {
+            dma_display->fillRect(0, 13, 64, 8, C_BLACK);
+            _drawDate(t);
+        }
     }
 
     // Wetter-Zeile: immer neu (scrollt); ab y-2=21 damit Grossbuchstaben-Umlautpunkte (y-2) geloescht werden

@@ -12,9 +12,13 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ### Added
 - Webinterface um eine Firmware-Update-Moeglichkeit direkt auf der Uhr erweitert: Im OTA-Tab kann jetzt eine `.bin`-Datei per Browser hochgeladen und direkt eingespielt werden; danach startet das Geraet automatisch neu [`0b8532a`]
+- Display-Layout als persistente Konfiguration vorbereitet: intern werden Panel-Spalten, Panel-Zeilen und Mapping-Modus gespeichert, damit spaeter 2x2-/ZigZag-Layouts angebunden werden koennen; im Webinterface sind aktuell bewusst nur `1x HUB75` und `2x HUB75 nebeneinander` auswählbar [`pending`]
 
 ### Changed
 - `HH:MM:SS`-Doppelpunkte um 1 Pixel nach links verschoben, damit der seitliche Abstand zu den Ziffern ausgewogener wirkt [`0d3de8f`]
+- Matrix-Initialisierung und dynamische Anzeigeelemente nutzen jetzt die konfigurierte virtuelle Displaybreite statt einer fest verdrahteten Zwei-Panel-Breite; Aenderungen am Panel-Layout werden beim Speichern als neustartpflichtig gemeldet [`pending`]
+- Bei `1x HUB75` verwendet die `HH:MM:SS`-Anzeige wieder das kompakte Ein-Panel-Layout aus `1.5.4`, damit die Uhrzeit nicht zu gross fuer 64x32 dargestellt wird [`pending`]
+- Wettertexte werden fuer die Webinterface-/API-Ausgabe wieder nach UTF-8 zurueckgewandelt, waehrend die displayinterne Latin-1-Umlautdarstellung unveraendert bleibt [`pending`]
 
 ## [1.6.0] - 2026-04-10
 

@@ -111,6 +111,25 @@ static String _sanitizeUtf8(const String& s) {
     return out;
 }
 
+static String weatherDisplayTextToUtf8(const String& s) {
+    String out;
+    out.reserve(s.length() + 4);
+    const uint8_t* p = (const uint8_t*)s.c_str();
+    while (*p) {
+        switch (*p) {
+            case 0xE4: out += "\xC3\xA4"; break; // ä
+            case 0xF6: out += "\xC3\xB6"; break; // ö
+            case 0xFC: out += "\xC3\xBC"; break; // ü
+            case 0xC4: out += "\xC3\x84"; break; // Ä
+            case 0xD6: out += "\xC3\x96"; break; // Ö
+            case 0xDC: out += "\xC3\x9C"; break; // Ü
+            default:   out += (char)*p; break;
+        }
+        p++;
+    }
+    return out;
+}
+
 // ============================================================
 // HTTP GET helper — gibt Status, Body und Fehlertext zurück
 // ============================================================

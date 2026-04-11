@@ -34,6 +34,11 @@ void displayShowOTA(uint32_t progress, uint32_t total);
 void displaySetOtaActive(bool active);
 void colorsInit();
 void displaySetBrightness(uint8_t brightness);
+int displayWidth();
+int displayHeight();
+uint8_t displayPanelColumns();
+uint8_t displayPanelRows();
+uint8_t displayPanelMapping();
 
 static uint8_t _clampU8(uint32_t value, uint8_t minVal, uint8_t maxVal) {
     if (value < minVal) return minVal;
@@ -167,6 +172,13 @@ input[type=checkbox]{width:auto;margin-right:6px}
 <!-- ANZEIGE -->
 <div id="p-display" class="panel">
   <label>Helligkeit (0-255) <input id="brightness" type="number" min="0" max="255"></label>
+  <label>HUB75-Layout
+    <select id="display_panel_cols">
+      <option value="1">1x HUB75 (64x32)</option>
+      <option value="2">2x HUB75 nebeneinander (128x32)</option>
+    </select>
+  </label>
+  <p style="font-size:.78em;color:#888;margin-top:4px">Aenderungen am Panel-Layout werden nach einem Neustart aktiv. Intern ist die Konfiguration bereits fuer spaeteres 2x2-/ZigZag-Mapping vorbereitet.</p>
   <label>Sprache
     <select id="lang">
       <option value="de">Deutsch</option>
@@ -246,12 +258,12 @@ input[type=checkbox]{width:auto;margin-right:6px}
 const fields=['sta_ssid','sta_pass','ap_password','wifi_timeout_sec','ntp1','ntp2','ntp3',
   'ntp_interval_min','tz','owm_apikey','owm_city','owm_lat','owm_lon','owm_use_coords',
   'owm_unit','owm_interval_min','brightness','lang','time_12h','date_format',
-  'anim_mode','seconds_mode','bottom_cycle_sec','scroll_speed_ms','forecast_scroll_up',
+  'anim_mode','seconds_mode','display_panel_cols','bottom_cycle_sec','scroll_speed_ms','forecast_scroll_up',
   'ota_enabled','ota_password',
   'color_digit','color_date','color_temp','color_warn','color_info',
   'color_sec','color_sec5','color_sec10'];
 // Select-Felder mit numerischen Werten (müssen als Int gespeichert werden)
-const numSelects=new Set(['owm_unit','time_12h','date_format','anim_mode','seconds_mode']);
+const numSelects=new Set(['owm_unit','time_12h','date_format','anim_mode','seconds_mode','display_panel_cols']);
 
 let statusInterval=null;
 
@@ -316,9 +328,10 @@ async function save(){
     else if(el.tagName==='SELECT'&&numSelects.has(f))d[f]=parseInt(el.value,10)||0;
     else d[f]=el.value;
   });
+  d.display_panel_rows=1;
   const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
   const j=await r.json();
-  showMsg(j.ok?'Gespeichert!':'Fehler: '+(j.error||'?'),j.ok);
+  showMsg(j.ok?(j.restart_required?'Gespeichert! Neustart erforderlich, damit das Display-Layout aktiv wird.':'Gespeichert!'):'Fehler: '+(j.error||'?'),j.ok);
 }
 
 async function loadStatus(){
@@ -329,6 +342,7 @@ async function loadStatus(){
     if(verEl)verEl.textContent='v'+d.firmware.replace(/^.*\s/,'');
     document.getElementById('statusBox').innerHTML=
       '<div><span class="lbl">Firmware</span><span class="val">'+d.firmware+'</span></div>'+
+      '<div><span class="lbl">Display</span><span class="val">'+(d.display_layout||'-')+'</span></div>'+
       '<div><span class="lbl">IP / mDNS</span><span class="val">'+d.ip+' / hub75clock.local</span></div>'+
       '<div><span class="lbl">WLAN</span><span class="val">'+d.ssid+' ('+d.rssi+' dBm)</span></div>'+
       '<div><span class="lbl">Uptime</span><span class="val">'+d.uptime+'</span></div>'+
@@ -470,6 +484,9 @@ void webServerSetup() {
         doc["anim_mode"]           = cfg.anim_mode;
         doc["seconds_mode"]        = cfg.seconds_mode;
         doc["forecast_scroll_up"]  = cfg.forecast_scroll_up;
+        doc["display_panel_cols"]  = cfg.display_panel_cols;
+        doc["display_panel_rows"]  = cfg.display_panel_rows;
+        doc["display_panel_map"]   = cfg.display_panel_map;
         doc["ota_enabled"]         = cfg.ota_enabled;
         doc["ota_password"]     = cfg.ota_password;
         doc["color_digit"]      = cfg.color_digit;
@@ -510,6 +527,10 @@ void webServerSetup() {
             cfg.owm_use_coords   = doc["owm_use_coords"]   | cfg.owm_use_coords;
             cfg.owm_unit         = _clampU8(doc["owm_unit"] | cfg.owm_unit, 0, 1);
             cfg.owm_interval_min = _clampU16(doc["owm_interval_min"] | cfg.owm_interval_min, 10, 1440);
+            uint8_t oldPanelCols = cfg.display_panel_cols;
+            uint8_t oldPanelRows = cfg.display_panel_rows;
+            uint8_t oldPanelMap  = cfg.display_panel_map;
+
             cfg.brightness       = _clampU8(doc["brightness"] | cfg.brightness, 0, 255);
             cfg.lang             = doc["lang"]             | cfg.lang.c_str();
             cfg.bottom_cycle_sec = _clampU8(doc["bottom_cycle_sec"] | cfg.bottom_cycle_sec, 2, 60);
@@ -519,6 +540,9 @@ void webServerSetup() {
             cfg.anim_mode        = _clampU8(doc["anim_mode"] | cfg.anim_mode, 0, 2);
             cfg.seconds_mode     = _clampU8(doc["seconds_mode"] | cfg.seconds_mode, 0, 3);
             cfg.forecast_scroll_up = doc["forecast_scroll_up"] | cfg.forecast_scroll_up;
+            cfg.display_panel_cols = _clampU8(doc["display_panel_cols"] | cfg.display_panel_cols, 1, 2);
+            cfg.display_panel_rows = _clampU8(doc["display_panel_rows"] | cfg.display_panel_rows, 1, 1);
+            cfg.display_panel_map  = _clampU8(doc["display_panel_map"]  | cfg.display_panel_map,  0, 1);
             cfg.ota_enabled        = doc["ota_enabled"]        | cfg.ota_enabled;
             cfg.ota_password     = doc["ota_password"]     | cfg.ota_password.c_str();
             cfg.color_digit      = doc["color_digit"]      | cfg.color_digit.c_str();
@@ -537,7 +561,16 @@ void webServerSetup() {
             // (betrifft Sprache, Standort, Einheit und API-Key-Änderungen)
             lastWeatherFetch = 0;
             configSave();
-            req->send(200, "application/json", "{\"ok\":true}");
+
+            bool restartRequired = (oldPanelCols != cfg.display_panel_cols)
+                                || (oldPanelRows != cfg.display_panel_rows)
+                                || (oldPanelMap  != cfg.display_panel_map);
+            String out;
+            JsonDocument resp;
+            resp["ok"] = true;
+            resp["restart_required"] = restartRequired;
+            serializeJson(resp, out);
+            req->send(200, "application/json", out);
         }
     );
 
@@ -547,6 +580,9 @@ void webServerSetup() {
         uint32_t nowMs = millis();
 
         doc["firmware"] = FW_VERSION;
+        doc["display_layout"] = String(displayPanelColumns()) + "x" + String(displayPanelRows())
+                              + " HUB75 (" + String(displayWidth()) + "x" + String(displayHeight())
+                              + ", " + (displayPanelMapping() == 0 ? "linear" : "zigzag") + ")";
         doc["ip"]       = apModeActive
                           ? WiFi.softAPIP().toString()
                           : WiFi.localIP().toString();
@@ -594,7 +630,7 @@ void webServerSetup() {
         if (weather.valid) {
             char wb[48];
             snprintf(wb, sizeof(wb), "%.1f° — %s",
-                     weather.current_temp, weather.current_cond.c_str());
+                     weather.current_temp, weatherDisplayTextToUtf8(weather.current_cond).c_str());
             doc["weather_status"] = wb;
         } else {
             doc["weather_status"] = weather.error.isEmpty()
