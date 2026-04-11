@@ -3,7 +3,7 @@
 Eine animierte Flip-Clock auf einem oder zwei 64×32 HUB75 LED-Matrix-Displays, betrieben von einem ESP32-S3.
 Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollständig über ein Browser-Webinterface konfigurierbar — kein Neu-Flashen notwendig.
 
-**Aktuelle Version:** 1.6.0
+**Aktuelle Version:** 1.6.1
 
 **Repository:** https://codeberg.org/diwou/Hubby_seventy_five
 
@@ -160,7 +160,7 @@ cd Hubby_seventy_five
 
 ## Manuelles Update Ohne IDE
 
-Wer weder die Arduino IDE noch VS Code mit PlatformIO nutzen moechte, kann die Dateien aus `Firmware/latest/` oder aus einer festen Version wie `Firmware/1.6.0/` direkt mit `esptool` flashen.
+Wer weder die Arduino IDE noch VS Code mit PlatformIO nutzen moechte, kann die Dateien aus `Firmware/latest/` oder aus einer festen Version wie `Firmware/1.6.1/` direkt mit `esptool` flashen.
 
 Die vier relevanten Flash-Offets sind:
 
@@ -214,9 +214,9 @@ esptool.py --chip esp32s3 --port COM4 --baud 921600 --before default_reset --aft
 
 Hinweise:
 - Wenn `esptool.py` nicht gefunden wird, klappt oft auch `python -m esptool`.
-- Bei einer festen Release-Version statt `Firmware/latest/` einfach z. B. `Firmware/1.6.0/` verwenden.
+- Bei einer festen Release-Version statt `Firmware/latest/` einfach z. B. `Firmware/1.6.1/` verwenden.
 - Wer gar nichts lokal installieren moechte, kann alternativ weiter den Browser-Installer nutzen.
-- Der Browser-Installer ist bereits auf dem aktuellen Stand: `Firmware/latest/manifest.json` zeigt derzeit auf Version `1.6.0`.
+- Der Browser-Installer ist bereits auf dem aktuellen Stand: `Firmware/latest/manifest.json` zeigt derzeit auf Version `1.6.1`.
 
 ---
 
