@@ -21,6 +21,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Matrix-Initialisierung und dynamische Anzeigeelemente nutzen jetzt die konfigurierte virtuelle Displaybreite statt einer fest verdrahteten Zwei-Panel-Breite; Aenderungen am Panel-Layout werden beim Speichern als neustartpflichtig gemeldet [`86957cd`]
 - Bei `1x HUB75` verwendet die `HH:MM:SS`-Anzeige wieder das kompakte Ein-Panel-Layout aus `1.5.4`, damit die Uhrzeit nicht zu gross fuer 64x32 dargestellt wird [`86957cd`]
 - Wettertexte werden fuer die Webinterface-/API-Ausgabe wieder nach UTF-8 zurueckgewandelt, waehrend die displayinterne Latin-1-Umlautdarstellung unveraendert bleibt [`86957cd`]
+- Die cspell-Konfiguration nutzt jetzt ein projektlokal versioniertes deutsches Wörterbuch, damit README, Changelog und deutschsprachige UI-Texte reproduzierbar geprüft werden können [`pending`]
 
 ## [1.6.0] - 2026-04-10
 
