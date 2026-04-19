@@ -990,26 +990,31 @@ static void _drawWeatherLine() {
 
     if (weatherMode == 0) {
         // --- Modus 0: aktuelles Wetter scrollend ---
+        uint32_t scrollStepMs = (cfg.scroll_speed_ms == 0) ? 1UL : (uint32_t)cfg.scroll_speed_ms;
         uint32_t scrollElapsed = now - weatherScrollMs;
-        if (scrollElapsed >= cfg.scroll_speed_ms) {
-            weatherScrollMs = now;
+        if (scrollElapsed >= scrollStepMs) {
+            uint32_t scrollSteps = scrollElapsed / scrollStepMs;
+            weatherScrollMs += scrollSteps * scrollStepMs;
             int textPx = _textWidthEx(weatherScrollStr);
             if (textPx > DISPLAY_W - 4) {
-                weatherScrollX256 -= 256;
-                if ((weatherScrollX256 >> 8) < -textPx) {
-                    weatherScrollX256 = (int32_t)(-textPx) << 8;  // einfrieren
-                    if (now - weatherLastMs >= cyclems) {
-                        weatherLastMs = now;
-                        if (maxMode > 1) {
-                            forecastTransitionActive = true;
-                            forecastTransitionFrom = 0;
-                            forecastTransitionTo = 1;
-                            forecastTransitionStep = 0;
-                            forecastTransitionMs = now;
-                        } else {
-                            _buildCurrentStr();  // kein Forecast: neu aufbauen
+                while (scrollSteps-- > 0) {
+                    weatherScrollX256 -= 256;
+                    if ((weatherScrollX256 >> 8) < -textPx) {
+                        weatherScrollX256 = (int32_t)(-textPx) << 8;  // einfrieren
+                        if (now - weatherLastMs >= cyclems) {
+                            weatherLastMs = now;
+                            if (maxMode > 1) {
+                                forecastTransitionActive = true;
+                                forecastTransitionFrom = 0;
+                                forecastTransitionTo = 1;
+                                forecastTransitionStep = 0;
+                                forecastTransitionMs = now;
+                            } else {
+                                _buildCurrentStr();  // kein Forecast: neu aufbauen
+                            }
+                            weatherScrollX256 = (int32_t)DISPLAY_W << 8;
                         }
-                        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
+                        break;
                     }
                 }
             } else {
