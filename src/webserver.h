@@ -28,12 +28,18 @@ static String   webUpdateError = "";
 extern bool     ntpSynced;
 extern uint32_t lastNtpSync;
 extern uint32_t lastWeatherFetch;
+extern String   lastStatusMsg;
+extern char     rtcLastWatchdog[160];
+extern char     rtcLastWatchdogPhase[32];
+extern uint32_t rtcLastWatchdogAgeMs;
+extern uint32_t rtcLastWatchdogEpoch;
 
 // Forward-Deklarationen (definiert in display.h)
 void displayShowOTA(uint32_t progress, uint32_t total);
 void displaySetOtaActive(bool active);
 void colorsInit();
 void displaySetBrightness(uint8_t brightness);
+const char* resetReasonName(esp_reset_reason_t reason);
 int displayWidth();
 int displayHeight();
 uint8_t displayPanelColumns();
@@ -266,23 +272,21 @@ const fields=['sta_ssid','sta_pass','ap_password','wifi_timeout_sec','ntp1','ntp
 const numSelects=new Set(['owm_unit','time_12h','date_format','anim_mode','seconds_mode','display_panel_cols']);
 
 let statusInterval=null;
+let statusLoading=false;
 
 function show(id,el){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('p-'+id).classList.add('active');
   el.classList.add('active');
-  if(id==='status'){loadStatus();startStatusTimer();}else{stopStatusTimer();}
+  if(id==='status'){startStatusTimer();loadStatus();}else{stopStatusTimer();}
 }
 
 function startStatusTimer(){
   stopStatusTimer();
-  let s=30;
   const t=document.getElementById('statusTimer');
-  statusInterval=setInterval(()=>{
-    s--;t.textContent='Auto-Refresh in '+s+'s';
-    if(s<=0){s=30;loadStatus();}
-  },1000);
+  t.textContent='Aktualisierung jede Sekunde';
+  statusInterval=setInterval(()=>{loadStatus();},1000);
 }
 function stopStatusTimer(){
   if(statusInterval){clearInterval(statusInterval);statusInterval=null;}
@@ -335,6 +339,8 @@ async function save(){
 }
 
 async function loadStatus(){
+  if(statusLoading)return;
+  statusLoading=true;
   try{
     const r=await fetch('/api/status');
     const d=await r.json();
@@ -347,6 +353,12 @@ async function loadStatus(){
       '<div><span class="lbl">WLAN</span><span class="val">'+d.ssid+' ('+d.rssi+' dBm)</span></div>'+
       '<div><span class="lbl">Uptime</span><span class="val">'+d.uptime+'</span></div>'+
       '<div><span class="lbl">Uhrzeit</span><span class="val">'+d.time+'</span></div>'+
+      '<div><span class="lbl">Meldung</span><span class="val">'+(d.system_msg||'-')+'</span></div>'+
+      '<div><span class="lbl">Letzter Watchdog</span><span class="val">'+(d.last_watchdog||'-')+'</span></div>'+
+      '<div><span class="lbl">Watchdog-Zeitpunkt</span><span class="val">'+(d.watchdog_time||'-')+'</span></div>'+
+      '<div><span class="lbl">Watchdog-Phase</span><span class="val">'+(d.watchdog_phase||'-')+'</span></div>'+
+      '<div><span class="lbl">Watchdog-Zeit</span><span class="val">'+fmtSec(Math.floor((d.watchdog_age_ms||0)/1000))+'</span></div>'+
+      '<div><span class="lbl">Boot-Grund</span><span class="val">'+(d.boot_reason||'-')+'</span></div>'+
       '<div><span class="lbl">NTP-Status</span><span class="val">'+d.ntp_status+'</span></div>'+
       '<div><span class="lbl">Aktiver NTP-Server</span><span class="val">'+d.ntp_active+'</span></div>'+
       '<div><span class="lbl">NTP-Server</span><span class="val">'+d.ntp_servers+'</span></div>'+
@@ -355,7 +367,11 @@ async function loadStatus(){
       '<div><span class="lbl">Wetter</span><span class="val">'+d.weather_status+'</span></div>'+
       '<div><span class="lbl">Nächstes Wetter</span><span class="val">'+fmtSec(d.next_weather_sec)+'</span></div>'+
       '<div><span class="lbl">Freier Heap</span><span class="val">'+d.heap+' Byte</span></div>';
-  }catch(e){document.getElementById('statusBox').textContent='Fehler beim Laden';}
+  }catch(e){
+    document.getElementById('statusBox').textContent='Fehler beim Laden';
+  }finally{
+    statusLoading=false;
+  }
 }
 
 async function searchCity(){
@@ -590,6 +606,19 @@ void webServerSetup() {
         doc["rssi"]     = apModeActive ? 0 : (int)WiFi.RSSI();
         doc["uptime"]   = _uptime();
         doc["heap"]     = ESP.getFreeHeap();
+        doc["system_msg"] = lastStatusMsg;
+        doc["last_watchdog"] = rtcLastWatchdog[0] ? rtcLastWatchdog : "kein Watchdog-Hänger gespeichert";
+        if (rtcLastWatchdogEpoch > 0) {
+            time_t wd = (time_t)rtcLastWatchdogEpoch;
+            char watchdogTimeBuf[24];
+            strftime(watchdogTimeBuf, sizeof(watchdogTimeBuf), "%d.%m.%Y %H:%M:%S", localtime(&wd));
+            doc["watchdog_time"] = watchdogTimeBuf;
+        } else {
+            doc["watchdog_time"] = "-";
+        }
+        doc["boot_reason"] = resetReasonName(esp_reset_reason());
+        doc["watchdog_phase"] = rtcLastWatchdogPhase[0] ? rtcLastWatchdogPhase : "-";
+        doc["watchdog_age_ms"] = rtcLastWatchdogAgeMs;
 
         time_t now = time(nullptr);
         char tbuf[24];

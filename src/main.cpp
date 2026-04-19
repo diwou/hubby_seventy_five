@@ -11,6 +11,7 @@
 #include <ESPmDNS.h>
 #include <LittleFS.h>
 #include <time.h>
+#include <cstring>
 
 #include "config.h"
 #include "display.h"
@@ -26,9 +27,30 @@ uint32_t lastWeatherFetch  = 0;
 uint32_t lastReconnectMs   = 0;
 bool     wifiConnected     = false;
 String   lastStatusMsg     = "";
-static constexpr uint32_t WATCHDOG_TIMEOUT_MS = 60000UL;
+static constexpr uint32_t WATCHDOG_TIMEOUT_MS = 120000UL;
 static volatile uint32_t watchdogLastKickMs = 0;
 static TaskHandle_t watchdogTaskHandle = nullptr;
+static const char* watchdogPhase = "boot";
+RTC_DATA_ATTR char rtcLastWatchdog[160] = "";
+RTC_DATA_ATTR char rtcLastWatchdogPhase[32] = "";
+RTC_DATA_ATTR uint32_t rtcLastWatchdogAgeMs = 0;
+RTC_DATA_ATTR uint32_t rtcLastWatchdogEpoch = 0;
+
+static void watchdogSetPhase(const char* phase) {
+    watchdogPhase = phase;
+}
+
+static void watchdogRecordHang(const char* phase, uint32_t ageMs) {
+    time_t now = time(nullptr);
+    rtcLastWatchdogEpoch = (now > 1700000000L) ? (uint32_t)now : 0;
+    snprintf(rtcLastWatchdog, sizeof(rtcLastWatchdog),
+             "Phase '%s' nach %lu ms ohne Heartbeat",
+             phase ? phase : "?",
+             (unsigned long)ageMs);
+    snprintf(rtcLastWatchdogPhase, sizeof(rtcLastWatchdogPhase), "%s",
+             phase ? phase : "?");
+    rtcLastWatchdogAgeMs = ageMs;
+}
 
 void appWatchdogFeed() {
     watchdogLastKickMs = millis();
@@ -41,8 +63,10 @@ static void setupWatchdog() {
             for (;;) {
                 uint32_t age = millis() - watchdogLastKickMs;
                 if (age > WATCHDOG_TIMEOUT_MS) {
-                    Serial.printf("[WDT] Kein Heartbeat seit %lu ms, Neustart...\n",
-                                  (unsigned long)age);
+                    watchdogRecordHang(watchdogPhase, age);
+                    Serial.printf("[WDT] Kein Heartbeat seit %lu ms in Phase '%s', Neustart...\n",
+                                  (unsigned long)age,
+                                  watchdogPhase ? watchdogPhase : "?");
                     delay(100);
                     ESP.restart();
                 }
@@ -63,7 +87,7 @@ static void setupWatchdog() {
     Serial.printf("[WDT] Monitor aktiv (%lu ms)\n", (unsigned long)WATCHDOG_TIMEOUT_MS);
 }
 
-static const char* resetReasonName(esp_reset_reason_t reason) {
+const char* resetReasonName(esp_reset_reason_t reason) {
     switch (reason) {
         case ESP_RST_UNKNOWN:   return "UNKNOWN";
         case ESP_RST_POWERON:   return "POWERON";
@@ -84,6 +108,7 @@ static const char* resetReasonName(esp_reset_reason_t reason) {
 // WiFi: Station-Modus verbinden
 // ============================================================
 static bool wifiConnect() {
+    watchdogSetPhase("wifi-connect");
     if (cfg.sta_ssid.isEmpty()) return false;
 
     Serial.printf("[WiFi] Verbinde mit '%s'...\n", cfg.sta_ssid.c_str());
@@ -111,6 +136,7 @@ static bool wifiConnect() {
 // AP-Modus starten (Captive Portal)
 // ============================================================
 static void startAP() {
+    watchdogSetPhase("ap-setup");
     apModeActive = true;
 
     appWatchdogFeed();
@@ -141,6 +167,7 @@ static void startAP() {
 // NTP konfigurieren + synchronisieren
 // ============================================================
 static void ntpSync() {
+    watchdogSetPhase("ntp-sync");
     configTzTime(cfg.tz.c_str(),
                  cfg.ntp1.c_str(),
                  cfg.ntp2.c_str(),
@@ -166,6 +193,7 @@ static void ntpSync() {
 // Setup
 // ============================================================
 void setup() {
+    watchdogSetPhase("setup");
     Serial.begin(115200);
     delay(300);
     setupWatchdog();
@@ -201,6 +229,7 @@ void setup() {
     dma_display->flipDMABuffer();  // zeigen
 
     // WiFi verbinden
+    watchdogSetPhase("wifi-connect");
     wifiConnected = wifiConnect();
 
     if (wifiConnected) {
@@ -210,6 +239,7 @@ void setup() {
             Serial.println("[mDNS] hub75clock.local");
         }
 
+        watchdogSetPhase("ntp-sync");
         ntpSync();
         webServerSetup();
 
@@ -218,6 +248,7 @@ void setup() {
         }
 
         // IP als scrollender Text anzeigen
+        watchdogSetPhase("display-scroll");
         String scrollMsg = WiFi.localIP().toString() + String("   hub75clock.local");
         displayScrollText(scrollMsg, C_INFO, 35);
 
@@ -229,6 +260,7 @@ void setup() {
             dma_display->setCursor(0, 9);
             dma_display->print("Wetter...");
             dma_display->flipDMABuffer();
+            watchdogSetPhase("weather-fetch");
             fetchWeather();
             lastWeatherFetch = millis();
         }
@@ -251,20 +283,24 @@ void setup() {
 // Loop
 // ============================================================
 void loop() {
+    watchdogSetPhase("loop");
     // Neustart sicher aus dem Haupt-Loop (nicht aus AsyncWebServer-Callback)
     if (factoryResetPending || restartPending) {
+        watchdogSetPhase("restart");
         appWatchdogFeed();
         delay(300);
         ESP.restart();
     }
 
     if (cfg.ota_enabled && wifiConnected) {
+        watchdogSetPhase("ota-handle");
         ArduinoOTA.handle();
     }
     if (otaRunning) return;
 
     // DNS-Server im AP-Modus
     if (apModeActive) {
+        watchdogSetPhase("ap-mode");
         dnsServer.processNextRequest();
         appWatchdogFeed();
         delay(5);
@@ -276,16 +312,18 @@ void loop() {
         wifiConnected = false;
         uint32_t now = millis();
         if (now - lastReconnectMs >= 30000UL) {
-            lastReconnectMs = now;
-            Serial.println("[WiFi] Verbindung verloren, Reconnect...");
+        lastReconnectMs = now;
+        Serial.println("[WiFi] Verbindung verloren, Reconnect...");
             if (lastStatusMsg != "Reconnect..") {
                 lastStatusMsg = "Reconnect..";
                 dma_display->clearScreen();
                 displayShowMessage(lastStatusMsg, C_WARN);
                 dma_display->flipDMABuffer();
             }
+            watchdogSetPhase("wifi-connect");
             wifiConnected = wifiConnect();
             if (wifiConnected) {
+                watchdogSetPhase("ntp-sync");
                 ntpSync();
                 if (cfg.ota_enabled) otaSetup();
                 lastStatusMsg = "";
@@ -300,6 +338,7 @@ void loop() {
     bool timeOk = getLocalTime(&t, 10);
 
     if (!timeOk || !ntpSynced) {
+        watchdogSetPhase("ntp-wait");
         if (lastStatusMsg != "NTP sync..") {
             lastStatusMsg = "NTP sync..";
             dma_display->clearScreen();
@@ -313,12 +352,16 @@ void loop() {
     lastStatusMsg = "";
 
     // Flip-Clock + Sekunden + Datum + Wetter zeichnen
+    watchdogSetPhase("display-update");
+    appWatchdogFeed();
     displayUpdate(&t);
+    appWatchdogFeed();
 
     // NTP re-sync
     uint32_t nowMs       = millis();
     uint32_t ntpInterval = (uint32_t)cfg.ntp_interval_min * 60000UL;
     if (nowMs - lastNtpSync >= ntpInterval) {
+        watchdogSetPhase("ntp-resync");
         lastNtpSync = nowMs;
         configTzTime(cfg.tz.c_str(), cfg.ntp1.c_str(),
                      cfg.ntp2.c_str(), cfg.ntp3.c_str());
@@ -330,6 +373,7 @@ void loop() {
     if (!cfg.owm_apikey.isEmpty() && wifiConnected &&
         (lastWeatherFetch == 0 || nowMs - lastWeatherFetch >= weatherInterval)) {
         lastWeatherFetch = nowMs;
+        watchdogSetPhase("weather-fetch");
         appWatchdogFeed();
         fetchWeather();
         appWatchdogFeed();
@@ -337,6 +381,7 @@ void loop() {
                       weather.current_temp, weather.current_cond.c_str());
     }
 
+    watchdogSetPhase("loop-idle");
     appWatchdogFeed();
     delay(10);  // ~80 FPS: geringerer Loop-Jitter → bessere NTP-Sync-Präzision
 }

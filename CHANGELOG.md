@@ -14,7 +14,11 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ### Fixed
 - Der neue Heartbeat-Watchdog prueft jetzt sauber, ob sein Task wirklich gestartet wurde. Wenn die Task-Erzeugung fehlschlaegt, wird das auch als Fehler gemeldet statt stillschweigend als aktiv zu gelten.
+- Der Watchdog meldet beim Ausloesen jetzt auch die zuletzt aktive Programmpassage, damit sich echte Hänger schneller von harmlosen Zwischenzuständen unterscheiden lassen.
+- Die Watchdog-Hängermeldung ist jetzt auch im Webinterface sichtbar, inklusive Phase, Dauer und aktuellem Boot-Grund.
+- Das Webinterface zeigt beim letzten Watchdog-Hänger jetzt auch den gespeicherten Zeitpunkt an, sofern zum Auslösezeitpunkt bereits eine gültige Uhrzeit vorhanden war.
 - OTA gibt die Display-Sperre nach einem erfolgreichen Abschluss jetzt wieder frei, damit ein verzögerter Neustart nicht auf einem dauerhaft blockierten Display endet.
+- Das Status-Tab im Webinterface aktualisiert sich jetzt per Ajax im 1-Sekunden-Takt und zeigt zusätzlich die letzte interne Gerätemeldung an.
 - Die Kurz-BOM in `kicad/README.md` wird jetzt direkt aus `kicad/fab/rev0.2/bom/bom.csv` generiert, zeigt jetzt auch die Bauformen mit an und kann mit `scripts/render_kicad_bom_summary.py --write-readme` reproduzierbar aktualisiert werden.
 - Die BOM-Übersicht nennt jetzt explizit, dass `U5` ein ESP32-S3-WROOM-1 mit PSRAM sein muss.
 - Statusbilder, die die Matrix kurz loeschen, markieren nun die statischen Uhr- und Datumsbereiche wieder als dirty. Dadurch kommen Uhrzeit, Datum und Wochentag nach einer kurzen NTP-/WLAN-Stoerung sofort komplett zurueck und bleiben nicht bis zur naechsten echten Aenderung leer [`572f1c1`]

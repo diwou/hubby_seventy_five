@@ -1129,6 +1129,7 @@ void displayReset() {
 // ============================================================
 void displayUpdate(struct tm* t) {
     if (displayOtaActive) return;
+    appWatchdogFeed();
 
     // Bei Wechsel des seconds_mode: gesamten Ziffernbereich in BEIDEN DMA-Buffern leeren.
     // clearModeBuf=2 sorgt dafür, dass fillRect in den nächsten 2 Frames ausgeführt wird
@@ -1151,6 +1152,7 @@ void displayUpdate(struct tm* t) {
     }
 
     _setFlipTime(t->tm_hour, t->tm_min, t->tm_sec);
+    appWatchdogFeed();
 
     uint32_t now = millis();
 
@@ -1193,4 +1195,5 @@ void displayUpdate(struct tm* t) {
     }
 
     dma_display->flipDMABuffer();
+    appWatchdogFeed();
 }
