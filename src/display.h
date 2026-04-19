@@ -1119,7 +1119,15 @@ void displayUpdate(struct tm* t) {
     dma_display->fillRect(0, 21, DISPLAY_W, 11, C_BLACK);
     _drawWeatherLine();
     if (forecastTransitionActive) {
+        dma_display->fillRect(0, 0, 64, _maxClockAreaHeight(), C_BLACK);
+        for (int i = 0; i < 6; i++) {
+            digitDirty[i] = 1;
+        }
         _drawFlipClock();
+        if (cfg.seconds_mode != 3) {
+            dma_display->fillRect(0, _secondsBarY(), 64, 2, C_BLACK);
+            _drawSeconds(t->tm_sec);
+        }
         _drawDateArea(t);
     }
 
