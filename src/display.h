@@ -657,8 +657,11 @@ static uint32_t  weatherLastMs    = 0;
 static int       weatherScrollX   = DISPLAY_W;
 static uint32_t  weatherScrollMs  = 0;
 static String    weatherScrollStr = "";
-static int8_t    forecastSlideY   = 0;    // 0=Endposition, >0=Einschub-Animation von unten
-static uint32_t  forecastSlideMs  = 0;
+static bool      forecastTransitionActive = false;
+static uint8_t   forecastTransitionFrom    = 1;
+static uint8_t   forecastTransitionTo      = 1;
+static uint8_t   forecastTransitionStep    = 0;
+static uint32_t  forecastTransitionMs      = 0;
 // Datum-Dirty-Counter auf Modulebene, damit displayReset() ihn zurücksetzen kann
 static int       datLastMday  = -1;
 static uint8_t   datDirty     = 2;
@@ -669,6 +672,16 @@ static void _invalidateStaticDisplay() {
         digitDirty[i] = 2;
     }
     datDirty = 2;
+}
+
+static uint16_t _fadeColor(uint16_t color, uint8_t fade) {
+    if (fade >= 255) return color;
+    if (fade == 0) return C_BLACK;
+
+    uint8_t r = (uint8_t)(((color >> 11) & 0x1F) * fade / 255);
+    uint8_t g = (uint8_t)(((color >>  5) & 0x3F) * fade / 255);
+    uint8_t b = (uint8_t)(( color        & 0x1F) * fade / 255);
+    return (uint16_t)((r << 11) | (g << 5) | b);
 }
 
 // ============================================================
@@ -761,8 +774,8 @@ static void _buildCurrentStr() {
 
 // Vorhersage idx=0..2 (+1/+2/+3 Tage) statisch, ganzzahlige Temps
 // Format: "Mo +18/-3" zentriert; Tag=Amber, Nacht=Blau
-// yOff > 0: Einschub-Animation (Inhalt erscheint tiefer, scrollt nach oben)
-static void _drawForecastStatic(int idx, int yOff = 0) {
+// yOff: vertikaler Versatz, fade: 0..255 gegen Schwarz
+static void _drawForecastStatic(int idx, int yOff = 0, uint8_t fade = 255) {
     char dayBuf[6], nightBuf[6];
     const char* unit = (cfg.owm_unit == 0) ? "C" : "F";
     snprintf(dayBuf,   sizeof(dayBuf),   "%+d", (int)roundf(weather.forecast[idx].temp_day));
@@ -777,21 +790,54 @@ static void _drawForecastStatic(int idx, int yOff = 0) {
     int totalW  = dayNamePx + 6 + dayPx + unitPx + 18 + nightPx + unitPx;
     int x       = max(0, (DISPLAY_W - totalW) / 2);
     const int y = 23 + yOff;
+    uint16_t warnCol = _fadeColor(C_WARN, fade);
+    uint16_t tempCol = _fadeColor(C_TEMP, fade);
+    uint16_t infoCol = _fadeColor(C_INFO, fade);
+    uint16_t dateCol = _fadeColor(C_DATE, fade);
 
     dma_display->setTextSize(1);
-    dma_display->setTextColor(C_WARN);
+    dma_display->setTextColor(warnCol);
     dma_display->setCursor(x, y);
     dma_display->print(dayName);
     x += dayNamePx + 6;
 
-    x = _drawTempWithUnit(x, y, dayBuf, C_TEMP, unit, C_INFO);
+    x = _drawTempWithUnit(x, y, dayBuf, tempCol, unit, infoCol);
 
-    dma_display->setTextColor(C_INFO);
+    dma_display->setTextColor(infoCol);
     dma_display->setCursor(x, y);
     dma_display->print(" / ");
     x += 18;
 
-    x = _drawTempWithUnit(x, y, nightBuf, C_DATE, unit, C_INFO);
+    x = _drawTempWithUnit(x, y, nightBuf, dateCol, unit, infoCol);
+}
+
+static void _drawForecastTransition(uint32_t now) {
+    const uint8_t transitionSteps = 10;
+    const uint32_t transitionMs = 20;
+
+    while (forecastTransitionActive && now - forecastTransitionMs >= transitionMs) {
+        forecastTransitionMs += transitionMs;
+        if (++forecastTransitionStep > transitionSteps) {
+            forecastTransitionActive = false;
+            weatherMode = forecastTransitionTo;
+            weatherLastMs = now;
+            break;
+        }
+    }
+
+    if (!forecastTransitionActive) {
+        _drawForecastStatic(weatherMode - 1, 0, 255);
+        return;
+    }
+
+    uint8_t step = forecastTransitionStep;
+    uint8_t fadeIn  = (uint8_t)(step * 255 / transitionSteps);
+    uint8_t fadeOut = (uint8_t)(255 - fadeIn);
+    int inY  = cfg.forecast_scroll_up ? (transitionSteps - step) : 0;
+    int outY = cfg.forecast_scroll_up ? -((int)step) : 0;
+
+    _drawForecastStatic(forecastTransitionFrom - 1, outY, fadeOut);
+    _drawForecastStatic(forecastTransitionTo   - 1, inY,  fadeIn);
 }
 
 static void _drawWeatherLine() {
@@ -844,22 +890,19 @@ static void _drawWeatherLine() {
         dma_display->setTextSize(1);
         _printStrEx(weatherScrollX, 23, weatherScrollStr, C_TEMP);
     } else {
-        // --- Modi 1-3: Vorhersage (ggf. mit Einschub-Animation von unten) ---
-        if (forecastSlideY > 0 && now - forecastSlideMs >= 20) {
-            forecastSlideMs = now;
-            forecastSlideY--;
-        }
-        _drawForecastStatic(weatherMode - 1, forecastSlideY);
-        if (now - weatherLastMs >= cyclems) {
-            weatherLastMs = now;
-            weatherMode   = (weatherMode + 1) % maxMode;
-            if (weatherMode == 0) {
-                _buildCurrentStr();
-                weatherScrollX = DISPLAY_W;
-            } else {
-                forecastSlideY  = cfg.forecast_scroll_up ? 10 : 0;
-                forecastSlideMs = now;
+        // --- Modi 1-3: Vorhersage mit Ein-/Ausblend-Übergang ---
+        if (!forecastTransitionActive) {
+            _drawForecastStatic(weatherMode - 1, 0, 255);
+            if (now - weatherLastMs >= cyclems) {
+                weatherLastMs = now;
+                forecastTransitionActive = true;
+                forecastTransitionFrom = weatherMode;
+                forecastTransitionTo = (weatherMode % 3) + 1;
+                forecastTransitionStep = 0;
+                forecastTransitionMs = now;
             }
+        } else {
+            _drawForecastTransition(now);
         }
     }
 }
@@ -961,7 +1004,11 @@ void displayReset() {
     weatherMode = 0; weatherLastMs = 0;
     weatherScrollX = DISPLAY_W; weatherScrollMs = 0;
     weatherScrollStr = "";
-    forecastSlideY = 0; forecastSlideMs = 0;
+    forecastTransitionActive = false;
+    forecastTransitionFrom = 1;
+    forecastTransitionTo = 1;
+    forecastTransitionStep = 0;
+    forecastTransitionMs = 0;
     datLastMday = -1; datDirty = 2;  // Datum in beiden DMA-Buffern neu zeichnen
     dma_display->clearScreen(); dma_display->flipDMABuffer();
     dma_display->clearScreen(); dma_display->flipDMABuffer();
