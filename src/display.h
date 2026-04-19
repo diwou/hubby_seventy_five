@@ -856,7 +856,7 @@ static void _drawForecastTransition(uint32_t now) {
 
     uint8_t phaseStep = step - transitionSteps;
     uint8_t fadeIn = (uint8_t)(phaseStep * 255 / transitionSteps);
-    int inY = cfg.forecast_scroll_up ? (2 - min<int>(phaseStep, 2)) : 0;
+    int inY = cfg.forecast_scroll_up ? (transitionSteps - phaseStep) : 0;
 
     if (forecastTransitionTo == 0) {
         _printStrEx(weatherScrollX, 23 + inY, weatherScrollStr, _fadeColor(C_TEMP, fadeIn));
