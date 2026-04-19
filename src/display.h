@@ -187,6 +187,7 @@ static constexpr int DIGIT_VISIBLE_H_HHMM   = 16;
 static constexpr int DIGIT_VISIBLE_H_HHMMSS = 14;
 static constexpr char NARROW_SPACE_MARKER   = '\x1f';
 static constexpr int  NARROW_SPACE_PX       = 3;
+static constexpr int  WEATHER_CANVAS_SCALE_X = 2;
 
 // ============================================================
 // Bitmap-Font 10×14: modern, bold (3px horizontal, 2px vertikal)
@@ -749,15 +750,39 @@ static int _printStrEx(Gfx& gfx, int x, int y, const String& s, uint16_t color) 
 }
 
 template<typename Gfx>
+static void _drawCharEx2x(Gfx& gfx, int x, int y, uint8_t c, uint16_t color) {
+    static GFXcanvas16 glyphCanvas(12, 10);
+    glyphCanvas.fillScreen(C_BLACK);
+    _drawCharEx(glyphCanvas, 0, 2, c, color);
+
+    for (int sy = 0; sy < 10; sy++) {
+        for (int sx = 0; sx < 12; sx++) {
+            if (glyphCanvas.getPixel(sx, sy) == C_BLACK) continue;
+            int dx = x + sx * WEATHER_CANVAS_SCALE_X;
+            int dy = y + sy - 2;
+            gfx.drawPixel(dx, dy, color);
+            gfx.drawPixel(dx + 1, dy, color);
+        }
+    }
+}
+
+template<typename Gfx>
+static int _printStrEx2x(Gfx& gfx, int x, int y, const String& s, uint16_t color) {
+    const uint8_t* p = (const uint8_t*)s.c_str();
+    while (*p) {
+        uint8_t c = *p++;
+        _drawCharEx2x(gfx, x, y, c, color);
+        x += _glyphAdvance(c) * WEATHER_CANVAS_SCALE_X;
+    }
+    return x;
+}
+
+template<typename Gfx>
 static int _drawTempWithUnit(Gfx& gfx, int x, int y, const char* temp, uint16_t tempColor,
                              const char* unit, uint16_t unitColor) {
     int tempPx = (int)strlen(temp) * 6;
-    gfx.setTextColor(tempColor);
-    gfx.setCursor(x, y);
-    gfx.print(temp);
-    gfx.setTextColor(unitColor);
-    gfx.setCursor(x + tempPx + NARROW_SPACE_PX, y);
-    gfx.print(unit);
+    _printStrEx2x(gfx, x * WEATHER_CANVAS_SCALE_X, y, String(temp), tempColor);
+    _printStrEx2x(gfx, (x + tempPx + NARROW_SPACE_PX) * WEATHER_CANVAS_SCALE_X, y, String(unit), unitColor);
     return x + tempPx + NARROW_SPACE_PX + 6;
 }
 
@@ -771,11 +796,16 @@ static void _printTextClippedToWeather(Gfx& gfx, int x, int y, const String& s, 
 }
 
 template<typename Gfx>
+static void _printTextClippedToWeather2x(Gfx& gfx, int x, int y, const String& s, uint16_t color) {
+    _printStrEx2x(gfx, x * WEATHER_CANVAS_SCALE_X, y, s, color);
+}
+
+template<typename Gfx>
 static int _drawTempWithUnitClippedToWeather(Gfx& gfx, int x, int y, const char* temp, uint16_t tempColor,
                                              const char* unit, uint16_t unitColor) {
     int tempPx = (int)strlen(temp) * 6;
-    _printTextClippedToWeather(gfx, x, y, String(temp), tempColor);
-    _printTextClippedToWeather(gfx, x + tempPx + NARROW_SPACE_PX, y, String(unit), unitColor);
+    _printStrEx2x(gfx, x * WEATHER_CANVAS_SCALE_X, y, String(temp), tempColor);
+    _printStrEx2x(gfx, (x + tempPx + NARROW_SPACE_PX) * WEATHER_CANVAS_SCALE_X, y, String(unit), unitColor);
     return x + tempPx + NARROW_SPACE_PX + 6;
 }
 
@@ -783,15 +813,25 @@ template<typename Gfx>
 static void _blitWeatherCanvas(Gfx& gfx) {
     for (int py = 0; py < WEATHER_BAND_H; py++) {
         for (int px = 0; px < DISPLAY_W; px++) {
-            dma_display->drawPixel(px, WEATHER_CLEAR_Y + py, gfx.getPixel(px, py));
+            uint16_t c0 = gfx.getPixel(px * WEATHER_CANVAS_SCALE_X, py);
+            uint16_t c1 = gfx.getPixel(px * WEATHER_CANVAS_SCALE_X + 1, py);
+            if (c0 == c1) {
+                dma_display->drawPixel(px, WEATHER_CLEAR_Y + py, c0);
+                continue;
+            }
+            uint8_t r = (((c0 >> 11) & 0x1F) + ((c1 >> 11) & 0x1F)) >> 1;
+            uint8_t g = (((c0 >> 5) & 0x3F) + ((c1 >> 5) & 0x3F)) >> 1;
+            uint8_t b = ((c0 & 0x1F) + (c1 & 0x1F)) >> 1;
+            dma_display->drawPixel(px, WEATHER_CLEAR_Y + py,
+                                   dma_display->color565(r, g, b));
         }
     }
 }
 
 template<typename Gfx>
 static void _drawInterpolatedScrollText(Gfx& gfx, int32_t x256, int y, const String& s, uint16_t color) {
-    int xRounded = (int)((x256 + 128) >> 8);
-    _printStrEx(gfx, xRounded, y, s, color);
+    int xCanvas = (int)((x256 + 64) >> 7);
+    _printStrEx2x(gfx, xCanvas, y, s, color);
 }
 
 static void _buildCurrentStr() {
@@ -841,16 +881,12 @@ static void _drawForecastStatic(Gfx& gfx, int idx, int yOff = 0, uint8_t fade = 
     uint16_t dateCol = _fadeColor(C_DATE, fade);
 
     gfx.setTextSize(1);
-    gfx.setTextColor(warnCol);
-    gfx.setCursor(x, y);
-    gfx.print(dayName);
+    _printTextClippedToWeather2x(gfx, x, y, dayName, warnCol);
     x += dayNamePx + 6;
 
     x = _drawTempWithUnit(gfx, x, y, dayBuf, tempCol, unit, infoCol);
 
-    gfx.setTextColor(infoCol);
-    gfx.setCursor(x, y);
-    gfx.print(" / ");
+    _printTextClippedToWeather2x(gfx, x, y, String(" / "), infoCol);
     x += 18;
 
     x = _drawTempWithUnit(gfx, x, y, nightBuf, dateCol, unit, infoCol);
@@ -876,12 +912,12 @@ static void _drawForecastStaticClippedToWeather(Gfx& gfx, int idx, int yOff, uin
     uint16_t infoCol = _fadeColor(C_INFO, fade);
     uint16_t dateCol = _fadeColor(C_DATE, fade);
 
-    _printTextClippedToWeather(gfx, x, y, dayName, warnCol);
+    _printTextClippedToWeather2x(gfx, x, y, dayName, warnCol);
     x += dayNamePx + 6;
 
     x = _drawTempWithUnitClippedToWeather(gfx, x, y, dayBuf, tempCol, unit, infoCol);
 
-    _printTextClippedToWeather(gfx, x, y, String(" / "), infoCol);
+    _printTextClippedToWeather2x(gfx, x, y, String(" / "), infoCol);
     x += 18;
 
     x = _drawTempWithUnitClippedToWeather(gfx, x, y, nightBuf, dateCol, unit, infoCol);
