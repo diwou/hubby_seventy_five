@@ -27,6 +27,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Forecast-Transition korrigiert die eigentliche Ursache: Die bewegte Vorhersage wird nun vor dem Schreiben auf das HUB75-Display auf das Wetterfenster ab `y=21` geclippt, statt die Uhrzeit nachtraeglich zu reparieren. Dadurch kann die alte Zeile komplett nach oben ausblenden, ohne auf dem linken Panel in die Uhrzeit zu schreiben; `pio run` erfolgreich [`186398b`]
 - Monitor-Watchdog ergänzt: Ein eigener FreeRTOS-Task ueberwacht jetzt den Heartbeat des Hauptpfads und startet das Geraet neu, wenn es wirklich haengt. OTA bleibt dabei aktiv, weil der Monitor nicht auf `esp_task_wdt` des Loop-Tasks angewiesen ist.
 - OTA-Watchdog-Falle beseitigt: Waehrend eines Firmware-Uploads fuettern jetzt die `ArduinoOTA`-Callbacks den Heartbeat mit, damit der Upload nicht selbst als Hänger endet.
+- KiCad-Projekt und Fertigungsdaten ins Repo einsortiert: `kicad/source/` enthält die Bearbeitungsquellen fuer Revision `0.2`, `kicad/fab/rev0.2/` die Gerber-, BOM- und Archiv-Artefakte; lokale Backups und Cache-Dateien bleiben per `.gitignore` ausgeschlossen.
 
 ## [1.6.1] - 2026-04-11
 

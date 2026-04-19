@@ -1,0 +1,5 @@
+# Lokale KiCad-Backups und Cache-Dateien
+Hubby Seventy Five-backups/
+production/backups/
+source/*.kicad_prl
+source/fp-info-cache

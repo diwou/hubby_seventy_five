@@ -63,6 +63,10 @@ Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollstän
 | **Display** | 64×32 HUB75 RGB LED-Matrix, 1 oder 2 Panels nebeneinander |
 | **Pegelwandler** | 74HCT245 (3,3 V → 5 V für HUB75-Signale) |
 
+### KiCad / Platine
+
+Die Platine liegt unter [`kicad/`](kicad/). Die bearbeitbaren KiCad-Quellen liegen in [`kicad/source/`](kicad/source/), die auslieferbaren Fertigungsdaten für Revision `0.2` in [`kicad/fab/rev0.2/`](kicad/fab/rev0.2/). Dort findest Du Gerber, Bohrdaten, BOM, Positionsdateien und den kompletten Fertigungs-ZIP.
+
 ---
 
 ## Verkabelung / GPIO
