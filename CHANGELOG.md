@@ -20,6 +20,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Der Forecast-Übergang wurde nach dem Praxistest entschärft: Die alte Kachel wird jetzt nur noch im Wetterfenster ausgeblendet, damit nichts mehr in Uhrzeit oder Datum hineinzeichnet; die neue Kachel startet wieder sichtbar von unten [`86bcc12`]
 - Wetterkreislauf repariert: Nach dem aktuellen Wetterlaufband startet die erste Vorhersage wieder per Uebergang, und nach der dritten Vorhersage springt das System sauber zum aktuellen Wetter zurueck. Damit wechselt die Anzeige wieder zyklisch zwischen Laufband und Vorhersage [`9739479`]
 - Wetterkreislauf erneut gefixt: Der Forecast-Zyklus kehrt nach dem dritten Tag wieder zum aktuellen Wetterlaufband zurueck, und der vertikale Uebergang bleibt dabei auf den Wetterbereich begrenzt, damit nichts mehr in die Uhrzeit hineinragt [`39f6d34`]
+- Forecast-Animation weiter entkoppelt: Erst blendet die alte Zeile komplett aus, erst danach faehrt die neue von unten ein. Damit ueberlagern sich Aus- und Einblenden nicht mehr [`2be3e2a`]
 
 ## [1.6.1] - 2026-04-11
 
