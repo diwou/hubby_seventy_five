@@ -844,7 +844,7 @@ static void _drawForecastTransition(uint32_t now) {
     if (step <= transitionSteps) {
         uint8_t phaseStep = step;
         uint8_t fadeOut = (uint8_t)(255 - (phaseStep * 255 / transitionSteps));
-        int outY = -min<int>(phaseStep, 2);
+        int outY = -phaseStep;
 
         if (forecastTransitionFrom == 0) {
             _printStrEx(weatherScrollX, 23 + outY, weatherScrollStr, _fadeColor(C_TEMP, fadeOut));
@@ -1119,6 +1119,7 @@ void displayUpdate(struct tm* t) {
     dma_display->fillRect(0, 21, DISPLAY_W, 11, C_BLACK);
     _drawWeatherLine();
     if (forecastTransitionActive) {
+        _drawFlipClock();
         _drawDateArea(t);
     }
 
