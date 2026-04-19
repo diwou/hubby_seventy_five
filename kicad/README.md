@@ -7,7 +7,7 @@ Dieses Verzeichnis enthält die Platinenquellen und die exportierten Fertigungsd
 - `source/` - bearbeitbare KiCad-Quellen für Revision `0.2`
 - `fab/rev0.2/gerber/` - Gerber-, Bohr- und Layer-Exporte
 - `fab/rev0.2/bom/` - BOM, Designatoren, Positionen und Netlist
-- `fab/rev0.2/archive/` - kompletter Fertigungs-ZIP der Revision
+- `fab/rev0.2/Hubby_Seventy_Five_0.2.zip` - komplettes Fertigungspaket für den Bestelldienstleister
 
 ## Hinweise
 
