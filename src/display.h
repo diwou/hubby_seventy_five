@@ -111,10 +111,10 @@ void displayInit() {
         DisplayPins::PIN_A, DisplayPins::PIN_B, DisplayPins::PIN_C, DisplayPins::PIN_D, -1,
         DisplayPins::PIN_LAT, DisplayPins::PIN_OE, DisplayPins::PIN_CLK
     };
-    // Mit PSRAM auf dem S3 kann der Treiber doppelt puffern; dadurch werden
-    // sichtbare Teilupdates beim Weather-Refresh vermieden.
+    // Einzeln gepufferter Treiber: der Wetterbereich wird pro Frame komplett
+    // neu aufgebaut, damit keine inkonsistenten Zwischenbilder stehen bleiben.
     HUB75_I2S_CFG mxconfig(PANEL_W, PANEL_H, DISPLAY_PANELS, pinmap, HUB75_I2S_CFG::FM6126A,
-                           HUB75_I2S_CFG::TYPE138, true);
+                           HUB75_I2S_CFG::TYPE138, false);
     (void)displayPanelMapping(); // vorbereitet fuer spaetere 2x2-/ZigZag-Mapping-Unterstuetzung
 
     dma_display = new MatrixPanel_I2S_DMA(mxconfig);
@@ -812,13 +812,7 @@ static int _drawTempWithUnitClippedToWeather(Gfx& gfx, int x, int y, const char*
 
 template<typename Gfx>
 static void _blitWeatherCanvas(Gfx& gfx) {
-    static GFXcanvas16 prevWeatherCanvas(displayWidth(), WEATHER_BAND_H);
     for (int py = 0; py < WEATHER_BAND_H; py++) {
-        struct Run { int start; int len; uint16_t color; };
-        Run runs[DISPLAY_W];
-        int runCount = 0;
-        int runStart = -1;
-        uint16_t runColor = C_BLACK;
         for (int px = 0; px < DISPLAY_W; px++) {
             uint16_t c0 = gfx.getPixel(px * WEATHER_CANVAS_SCALE_X, py);
             uint16_t c1 = gfx.getPixel(px * WEATHER_CANVAS_SCALE_X + 1, py);
@@ -829,35 +823,7 @@ static void _blitWeatherCanvas(Gfx& gfx) {
                 uint8_t b = ((c0 & 0x1F) + (c1 & 0x1F)) >> 1;
                 outColor = dma_display->color565(r, g, b);
             }
-            if (prevWeatherCanvas.getPixel(px, py) == outColor) {
-                if (runStart >= 0) {
-                    runs[runCount++] = { runStart, px - runStart, runColor };
-                    runStart = -1;
-                }
-            } else {
-                if (runStart < 0) {
-                    runStart = px;
-                    runColor = outColor;
-                } else if (outColor != runColor) {
-                    runs[runCount++] = { runStart, px - runStart, runColor };
-                    runStart = px;
-                    runColor = outColor;
-                }
-                prevWeatherCanvas.drawPixel(px, py, outColor);
-            }
-        }
-        if (runStart >= 0) {
-            runs[runCount++] = { runStart, DISPLAY_W - runStart, runColor };
-        }
-        for (int i = 0; i < runCount; i++) {
-            if (runs[i].color != C_BLACK) {
-                dma_display->drawFastHLine(runs[i].start, WEATHER_CLEAR_Y + py, runs[i].len, runs[i].color);
-            }
-        }
-        for (int i = 0; i < runCount; i++) {
-            if (runs[i].color == C_BLACK) {
-                dma_display->drawFastHLine(runs[i].start, WEATHER_CLEAR_Y + py, runs[i].len, runs[i].color);
-            }
+            dma_display->drawPixel(px, WEATHER_CLEAR_Y + py, outColor);
         }
     }
 }
