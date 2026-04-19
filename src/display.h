@@ -813,11 +813,12 @@ static void _drawForecastStatic(int idx, int yOff = 0, uint8_t fade = 255) {
 
 static void _drawForecastTransition(uint32_t now) {
     const uint8_t transitionSteps = 10;
+    const uint8_t totalSteps = transitionSteps * 2;
     const uint32_t transitionMs = 20;
 
     while (forecastTransitionActive && now - forecastTransitionMs >= transitionMs) {
         forecastTransitionMs += transitionMs;
-        if (++forecastTransitionStep > transitionSteps) {
+        if (++forecastTransitionStep > totalSteps) {
             forecastTransitionActive = false;
             weatherMode = forecastTransitionTo;
             weatherLastMs = now;
@@ -840,19 +841,24 @@ static void _drawForecastTransition(uint32_t now) {
     }
 
     uint8_t step = forecastTransitionStep;
-    uint8_t fadeIn  = (uint8_t)(step * 255 / transitionSteps);
-    uint8_t fadeOut = (uint8_t)(255 - fadeIn);
-    int inY  = cfg.forecast_scroll_up ? (transitionSteps - step) : 0;
-    int outY = (forecastTransitionFrom == 0) ? 0 : -min<int>(step, 2);
+    if (step <= transitionSteps) {
+        uint8_t phaseStep = step;
+        uint8_t fadeOut = (uint8_t)(255 - (phaseStep * 255 / transitionSteps));
+        int outY = -min<int>(phaseStep, 2);
 
-    if (forecastTransitionFrom == 0) {
-        _printStrEx(weatherScrollX, 23, weatherScrollStr, _fadeColor(C_TEMP, fadeOut));
-    } else {
-        _drawForecastStatic(forecastTransitionFrom - 1, outY, fadeOut);
+        if (forecastTransitionFrom == 0) {
+            _printStrEx(weatherScrollX, 23 + outY, weatherScrollStr, _fadeColor(C_TEMP, fadeOut));
+        } else {
+            _drawForecastStatic(forecastTransitionFrom - 1, outY, fadeOut);
+        }
+        return;
     }
 
+    uint8_t phaseStep = step - transitionSteps;
+    uint8_t fadeIn = (uint8_t)(phaseStep * 255 / transitionSteps);
+    int inY = cfg.forecast_scroll_up ? (2 - min<int>(phaseStep, 2)) : 0;
+
     if (forecastTransitionTo == 0) {
-        dma_display->setTextSize(1);
         _printStrEx(weatherScrollX, 23 + inY, weatherScrollStr, _fadeColor(C_TEMP, fadeIn));
     } else {
         _drawForecastStatic(forecastTransitionTo - 1, inY, fadeIn);
