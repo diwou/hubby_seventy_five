@@ -13,7 +13,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ## [1.6.2] - 2026-04-19
 
 ### Fixed
-- Der aktuelle Wetter-Scroll nutzt fuer die sichtbare Bewegung wieder einen doppelt breiten Zwischenpuffer, damit die halben Positionswechsel nicht mehr als periodisches Ruckeln sichtbar werden [`082ad8a`]
+- Der aktuelle Wetter-Scroll nutzt fuer die sichtbare Bewegung wieder einen doppelt breiten Zwischenpuffer, damit die halben Positionswechsel nicht mehr als periodisches Ruckeln sichtbar werden [`221ebe0`]
 - Der aktuelle Wetter-Scroll nutzt jetzt wieder eine feste Zeitbasis mit Festkomma-Position, ohne Forecast oder Übergänge anzufassen [`2b9e867`]
 - Beim Neustart des aktuellen Wetter-Scrolls wird der Scroll-Start jetzt mit zurückgesetzt, damit nicht nur der Zeilenschluss sichtbar wird [`2b9e867`]
 - Die Wetterzeile wurde wieder auf die alte Anzeige zurückgesetzt, nachdem die jüngsten Experimente Artefakte und Flickern erzeugt hatten [`b035168`]
