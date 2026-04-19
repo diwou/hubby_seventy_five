@@ -17,6 +17,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Vorhersage-Kacheln wechseln jetzt als Uebergang nach oben weg: Die aktuelle Kachel faehrt und blendet nach oben aus, waehrend die naechste von unten einfaehrt und dabei eingeblendet wird [`200baba`]
 - Der neue Vorhersage-Uebergang baut jetzt sauber ohne alte `forecastSlide*`-Reste und wurde mit `pio run` erfolgreich kompiliert.
 - Der Vorhersage-Uebergang bleibt jetzt im Wetterfenster: Die Datumszeile wird waehrend des Wechsels nach dem Wetter-Redraw noch einmal sauber ueberzeichnet, damit beim Hochfahren keine Artefakte mehr in die Uhr-/Datumszone laufen [`bfcbea4`]
+- Der Forecast-Übergang wurde nach dem Praxistest entschärft: Die alte Kachel wird jetzt nur noch im Wetterfenster ausgeblendet, damit nichts mehr in Uhrzeit oder Datum hineinzeichnet; die neue Kachel startet wieder sichtbar von unten [`86bcc12`]
 
 ## [1.6.1] - 2026-04-11
 
