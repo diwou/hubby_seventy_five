@@ -266,14 +266,21 @@ void setup() {
             otaSetup();
         }
 
+        // Wetter direkt nach erfolgreichem WLAN/NTP-Setup anstoßen, damit es
+        // während des anschließenden IP-/Hostname-Scrolltexts bereits geladen ist.
+        if (!cfg.owm_apikey.isEmpty()) {
+            watchdogSetPhase("weather-fetch");
+            appWatchdogFeed();
+            if (fetchWeather()) {
+                lastWeatherFetch = millis();
+            }
+            appWatchdogFeed();
+        }
+
         // IP als scrollender Text anzeigen
         watchdogSetPhase("display-scroll");
         String scrollMsg = WiFi.localIP().toString() + String("   hub75clock.local");
         displayScrollText(scrollMsg, C_INFO, 35);
-
-        // Wetter wird im normalen Loop abgerufen, damit der Start nicht an
-        // einem blockierenden Netzwerk- oder API-Problem hängen bleiben kann.
-        lastWeatherFetch = 0;
 
     } else {
         startAP();

@@ -980,6 +980,8 @@ static void _drawWeatherLine() {
     if (weatherScrollStr.isEmpty()) {
         weatherLastMs = now;
         _buildCurrentStr();
+        weatherScrollMs = now;
+        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
     }
 
     if (forecastTransitionActive) {
@@ -992,6 +994,10 @@ static void _drawWeatherLine() {
         // --- Modus 0: aktuelles Wetter scrollend ---
         uint32_t scrollStepMs = (cfg.scroll_speed_ms == 0) ? 1UL : (uint32_t)cfg.scroll_speed_ms;
         uint32_t scrollElapsed = now - weatherScrollMs;
+        uint32_t scrollPhase256 = (scrollElapsed >= scrollStepMs)
+                                    ? 255UL
+                                    : ((scrollElapsed * 256UL) / scrollStepMs);
+        int32_t scrollDrawX256 = weatherScrollX256 - (int32_t)scrollPhase256;
         if (scrollElapsed >= scrollStepMs) {
             uint32_t scrollSteps = scrollElapsed / scrollStepMs;
             weatherScrollMs += scrollSteps * scrollStepMs;
@@ -1011,6 +1017,8 @@ static void _drawWeatherLine() {
                                 forecastTransitionMs = now;
                             } else {
                                 _buildCurrentStr();  // kein Forecast: neu aufbauen
+                                weatherScrollMs = now;
+                                weatherScrollX256 = (int32_t)DISPLAY_W << 8;
                             }
                             weatherScrollX256 = (int32_t)DISPLAY_W << 8;
                         }
@@ -1030,12 +1038,14 @@ static void _drawWeatherLine() {
                         weatherScrollX256 = (int32_t)DISPLAY_W << 8;
                     } else {
                         _buildCurrentStr();
+                        weatherScrollMs = now;
+                        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
                     }
                 }
             }
         }
         weatherCanvas.setTextSize(1);
-        _drawInterpolatedScrollText(weatherCanvas, weatherScrollX256, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
+        _drawInterpolatedScrollText(weatherCanvas, scrollDrawX256, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
         _blitWeatherCanvas(weatherCanvas);
         return;
     }
