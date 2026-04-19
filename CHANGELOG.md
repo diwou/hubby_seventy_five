@@ -14,6 +14,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ### Fixed
 - Der aktuelle Wetter-Scroll nutzt jetzt wieder eine feste Zeitbasis mit Festkomma-Position, ohne Forecast oder Übergänge anzufassen [`2b9e867`]
+- Beim Neustart des aktuellen Wetter-Scrolls wird der Scroll-Start jetzt mit zurückgesetzt, damit nicht nur der Zeilenschluss sichtbar wird [`2b9e867`]
 - Die Wetterzeile wurde wieder auf die alte Anzeige zurückgesetzt, nachdem die jüngsten Experimente Artefakte und Flickern erzeugt hatten [`b035168`]
 - Der neue Heartbeat-Watchdog prueft jetzt sauber, ob sein Task wirklich gestartet wurde. Wenn die Task-Erzeugung fehlschlaegt, wird das auch als Fehler gemeldet statt stillschweigend als aktiv zu gelten.
 - Der Watchdog meldet beim Ausloesen jetzt auch die zuletzt aktive Programmpassage, damit sich echte Hänger schneller von harmlosen Zwischenzuständen unterscheiden lassen.

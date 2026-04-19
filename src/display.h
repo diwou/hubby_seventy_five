@@ -959,6 +959,7 @@ static void _drawWeatherLine() {
         weatherLastMs = now;
         _buildCurrentStr();
         weatherScrollX256 = (int32_t)DISPLAY_W << 8;
+        weatherScrollMs = now;
     }
 
     if (forecastTransitionActive) {
@@ -991,6 +992,7 @@ static void _drawWeatherLine() {
                             _buildCurrentStr();  // kein Forecast: neu aufbauen
                         }
                         weatherScrollX256 = (int32_t)DISPLAY_W << 8;
+                        weatherScrollMs = now;
                     }
                 }
             } else {
@@ -1004,6 +1006,7 @@ static void _drawWeatherLine() {
                         forecastTransitionStep = 0;
                         forecastTransitionMs = now;
                         weatherScrollX256 = (int32_t)DISPLAY_W << 8;
+                        weatherScrollMs = now;
                     } else {
                         _buildCurrentStr();
                     }
