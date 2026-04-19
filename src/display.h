@@ -788,6 +788,24 @@ static void _blitWeatherCanvas(Gfx& gfx) {
     }
 }
 
+template<typename Gfx>
+static void _blitWeatherCanvas2x(Gfx& gfx) {
+    for (int py = 0; py < WEATHER_BAND_H; py++) {
+        for (int px = 0; px < DISPLAY_W; px++) {
+            uint16_t c0 = gfx.getPixel(px * 2, py);
+            uint16_t c1 = gfx.getPixel(px * 2 + 1, py);
+            if (c0 == c1) {
+                dma_display->drawPixel(px, WEATHER_CLEAR_Y + py, c0);
+            } else {
+                uint8_t r = (((c0 >> 11) & 0x1F) + ((c1 >> 11) & 0x1F)) >> 1;
+                uint8_t g = (((c0 >> 5) & 0x3F) + ((c1 >> 5) & 0x3F)) >> 1;
+                uint8_t b = ((c0 & 0x1F) + (c1 & 0x1F)) >> 1;
+                dma_display->drawPixel(px, WEATHER_CLEAR_Y + py, dma_display->color565(r, g, b));
+            }
+        }
+    }
+}
+
 static void _buildCurrentStr() {
     if (!weather.valid || cfg.owm_apikey.isEmpty()) {
         weatherScrollStr = cfg.owm_apikey.isEmpty() ? "Kein API-Key" : "Kein Wetter";
@@ -948,11 +966,13 @@ static void _drawDateArea(struct tm* t) {
 
 static void _drawWeatherLine() {
     static GFXcanvas16 weatherCanvas(displayWidth(), WEATHER_BAND_H);
+    static GFXcanvas16 weatherScrollCanvas(displayWidth() * 2, WEATHER_BAND_H);
     uint32_t now      = millis();
     uint32_t cyclems  = (uint32_t)cfg.bottom_cycle_sec * 1000UL;
     uint8_t  maxMode  = (weather.valid && !cfg.owm_apikey.isEmpty()) ? 4 : 1;
 
     weatherCanvas.fillScreen(C_BLACK);
+    weatherScrollCanvas.fillScreen(C_BLACK);
 
     // Erstinitialisierung
     if (weatherScrollStr.isEmpty()) {
@@ -1013,9 +1033,10 @@ static void _drawWeatherLine() {
                 }
             }
         }
-        weatherCanvas.setTextSize(1);
-        _printStrEx(weatherCanvas, (int)(weatherScrollX256 >> 8), WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
-        _blitWeatherCanvas(weatherCanvas);
+        weatherScrollCanvas.setTextSize(1);
+        int xCanvas = (int)((weatherScrollX256 + 64) >> 7);
+        _printStrEx(weatherScrollCanvas, xCanvas, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
+        _blitWeatherCanvas2x(weatherScrollCanvas);
         return;
     }
 
