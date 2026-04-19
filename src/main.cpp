@@ -252,18 +252,9 @@ void setup() {
         String scrollMsg = WiFi.localIP().toString() + String("   hub75clock.local");
         displayScrollText(scrollMsg, C_INFO, 35);
 
-        // Initiales Wetter
-        if (!cfg.owm_apikey.isEmpty()) {
-            dma_display->clearScreen();
-            dma_display->setTextSize(1);
-            dma_display->setTextColor(C_INFO);
-            dma_display->setCursor(0, 9);
-            dma_display->print("Wetter...");
-            dma_display->flipDMABuffer();
-            watchdogSetPhase("weather-fetch");
-            fetchWeather();
-            lastWeatherFetch = millis();
-        }
+        // Wetter wird im normalen Loop abgerufen, damit der Start nicht an
+        // einem blockierenden Netzwerk- oder API-Problem hängen bleiben kann.
+        lastWeatherFetch = 0;
 
     } else {
         startAP();

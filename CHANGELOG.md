@@ -4,7 +4,7 @@ Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumenti
 
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
-Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten stehen, damit auch bei mehreren Commits am selben Tag jede Aenderung eindeutig nachvollziehbar bleibt. Sammel-IDs nur fuer Release-/Milestone-Metadaten, nicht als Ersatz fuer Einzelreferenzen.
+Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten stehen, damit auch bei mehreren Commits am selben Tag jede Aenderung eindeutig nachvollziehbar bleibt. Sammel-IDs nur fuer Release-/Milestone-Metadaten, nicht als Ersatz fuer Einzelreferenzen.
 
 ---
 
@@ -17,6 +17,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Der Watchdog meldet beim Ausloesen jetzt auch die zuletzt aktive Programmpassage, damit sich echte Hänger schneller von harmlosen Zwischenzuständen unterscheiden lassen.
 - Die Watchdog-Hängermeldung ist jetzt auch im Webinterface sichtbar, inklusive Phase, Dauer und aktuellem Boot-Grund.
 - Das Webinterface zeigt beim letzten Watchdog-Hänger jetzt auch den gespeicherten Zeitpunkt an, sofern zum Auslösezeitpunkt bereits eine gültige Uhrzeit vorhanden war.
+- Der Wetterabruf wurde aus dem `setup()`-Pfad entfernt, damit ein blockierender API- oder Netzfehler den Start nicht mehr bei `Wetter...` festhält; der normale Loop übernimmt den Abruf.
 - OTA gibt die Display-Sperre nach einem erfolgreichen Abschluss jetzt wieder frei, damit ein verzögerter Neustart nicht auf einem dauerhaft blockierten Display endet.
 - Das Status-Tab im Webinterface aktualisiert sich jetzt per Ajax im 1-Sekunden-Takt und zeigt zusätzlich die letzte interne Gerätemeldung an.
 - Die Kurz-BOM in `kicad/README.md` wird jetzt direkt aus `kicad/fab/rev0.2/bom/bom.csv` generiert, zeigt jetzt auch die Bauformen mit an und kann mit `scripts/render_kicad_bom_summary.py --write-readme` reproduzierbar aktualisiert werden.
