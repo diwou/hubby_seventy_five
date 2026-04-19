@@ -40,6 +40,30 @@ static void watchdogSetPhase(const char* phase) {
     watchdogPhase = phase;
 }
 
+static void resetRuntimeState() {
+    apModeActive = false;
+    otaRunning = false;
+    restartPending = false;
+    factoryResetPending = false;
+    webUpdateOk = false;
+    webUpdateError = "";
+    ntpSynced = false;
+    lastNtpSync = 0;
+    lastWeatherFetch = 0;
+    lastReconnectMs = 0;
+    wifiConnected = false;
+    lastStatusMsg = "";
+    watchdogPhase = "boot";
+    watchdogTaskHandle = nullptr;
+    watchdogLastKickMs = millis();
+}
+
+static void resetWiFiStack() {
+    WiFi.disconnect(true, true);
+    WiFi.mode(WIFI_OFF);
+    delay(100);
+}
+
 static void watchdogRecordHang(const char* phase, uint32_t ageMs) {
     time_t now = time(nullptr);
     rtcLastWatchdogEpoch = (now > 1700000000L) ? (uint32_t)now : 0;
@@ -196,6 +220,8 @@ void setup() {
     watchdogSetPhase("setup");
     Serial.begin(115200);
     delay(300);
+    resetRuntimeState();
+    resetWiFiStack();
     setupWatchdog();
     displayPreparePins();
     Serial.printf("\n\n=== %s ===\n", FW_VERSION);
