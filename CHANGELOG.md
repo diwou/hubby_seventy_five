@@ -14,6 +14,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ### Fixed
 - Statusbilder, die die Matrix kurz loeschen, markieren nun die statischen Uhr- und Datumsbereiche wieder als dirty. Dadurch kommen Uhrzeit, Datum und Wochentag nach einer kurzen NTP-/WLAN-Stoerung sofort komplett zurueck und bleiben nicht bis zur naechsten echten Aenderung leer [`572f1c1`]
+- Vorhersage-Kacheln wechseln jetzt als Uebergang nach oben weg: Die aktuelle Kachel faehrt und blendet nach oben aus, waehrend die naechste von unten einfaehrt und dabei eingeblendet wird [`200baba`]
 
 ## [1.6.1] - 2026-04-11
 
