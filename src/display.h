@@ -668,6 +668,8 @@ static uint32_t  forecastTransitionMs      = 0;
 static constexpr int WEATHER_CLEAR_Y = 21;
 static constexpr int WEATHER_TEXT_Y  = 23;
 static constexpr int WEATHER_TEXT_H  = 8;
+static int WEATHER_BAND_H = DISPLAY_H - WEATHER_CLEAR_Y;
+static int WEATHER_BAND_Y = WEATHER_TEXT_Y - WEATHER_CLEAR_Y;
 // Datum-Dirty-Counter auf Modulebene, damit displayReset() ihn zurücksetzen kann
 static int       datLastMday  = -1;
 static uint8_t   datDirty     = 2;
@@ -700,7 +702,8 @@ static uint16_t _fadeColor(uint16_t color, uint8_t fade) {
 //   Großbuchstaben  (A/O/U): Body ab Row 0 → Punkte bei y-2 (2px über Zelle), Gap = y-1
 // fillRect(0, 21, 64, 11) deckt y-2=21 ab (weather-y=23).
 // ============================================================
-static void _drawCharEx(int x, int y, uint8_t c, uint16_t color) {
+template<typename Gfx>
+static void _drawCharEx(Gfx& gfx, int x, int y, uint8_t c, uint16_t color) {
     if (c == (uint8_t)NARROW_SPACE_MARKER) return;
     char base = 0;
     bool upper = false;
@@ -713,12 +716,12 @@ static void _drawCharEx(int x, int y, uint8_t c, uint16_t color) {
         case 0xDC: base = 'U'; upper = true; break;  // Ü
     }
     if (base) {
-        dma_display->drawChar(x, y, base, color, C_BLACK, 1);
+        gfx.drawChar(x, y, base, color, C_BLACK, 1);
         int dotY = upper ? y - 2 : y;  // Groß: 2px über Zelle (Gap y-1); Klein: Row 0 (Gap y+1)
-        dma_display->drawPixel(x + 1, dotY, color);
-        dma_display->drawPixel(x + 3, dotY, color);
+        gfx.drawPixel(x + 1, dotY, color);
+        gfx.drawPixel(x + 3, dotY, color);
     } else {
-        dma_display->drawChar(x, y, (char)c, color, C_BLACK, 1);
+        gfx.drawChar(x, y, (char)c, color, C_BLACK, 1);
     }
 }
 
@@ -734,55 +737,55 @@ static int _textWidthEx(const String& s) {
 }
 
 // Gibt String mit Umlaut-Unterstützung aus; liefert End-x zurück.
-static int _printStrEx(int x, int y, const String& s, uint16_t color) {
+template<typename Gfx>
+static int _printStrEx(Gfx& gfx, int x, int y, const String& s, uint16_t color) {
     const uint8_t* p = (const uint8_t*)s.c_str();
     while (*p) {
         uint8_t c = *p++;
-        _drawCharEx(x, y, c, color);
+        _drawCharEx(gfx, x, y, c, color);
         x += _glyphAdvance(c);
     }
     return x;
 }
 
-static int _drawTempWithUnit(int x, int y, const char* temp, uint16_t tempColor,
+template<typename Gfx>
+static int _drawTempWithUnit(Gfx& gfx, int x, int y, const char* temp, uint16_t tempColor,
                              const char* unit, uint16_t unitColor) {
     int tempPx = (int)strlen(temp) * 6;
-    dma_display->setTextColor(tempColor);
-    dma_display->setCursor(x, y);
-    dma_display->print(temp);
-    dma_display->setTextColor(unitColor);
-    dma_display->setCursor(x + tempPx + NARROW_SPACE_PX, y);
-    dma_display->print(unit);
+    gfx.setTextColor(tempColor);
+    gfx.setCursor(x, y);
+    gfx.print(temp);
+    gfx.setTextColor(unitColor);
+    gfx.setCursor(x + tempPx + NARROW_SPACE_PX, y);
+    gfx.print(unit);
     return x + tempPx + NARROW_SPACE_PX + 6;
 }
 
-static void _printTextClippedToWeather(int x, int y, const String& s, uint16_t color) {
-    static GFXcanvas1 canvas(PANEL_W * 2, WEATHER_TEXT_H);
-
-    canvas.fillScreen(0);
-    canvas.setTextWrap(false);
-    canvas.setTextSize(1);
-    canvas.setTextColor(1);
-    canvas.setCursor(x, 0);
-    canvas.print(s);
-
-    for (int py = 0; py < WEATHER_TEXT_H; py++) {
-        int sy = y + py;
-        if (sy < WEATHER_CLEAR_Y || sy >= DISPLAY_H) continue;
-        for (int px = 0; px < DISPLAY_W; px++) {
-            if (canvas.getPixel(px, py)) {
-                dma_display->drawPixel(px, sy, color);
-            }
-        }
-    }
+template<typename Gfx>
+static void _printTextClippedToWeather(Gfx& gfx, int x, int y, const String& s, uint16_t color) {
+    gfx.setTextWrap(false);
+    gfx.setTextSize(1);
+    gfx.setTextColor(color);
+    gfx.setCursor(x, y);
+    gfx.print(s);
 }
 
-static int _drawTempWithUnitClippedToWeather(int x, int y, const char* temp, uint16_t tempColor,
+template<typename Gfx>
+static int _drawTempWithUnitClippedToWeather(Gfx& gfx, int x, int y, const char* temp, uint16_t tempColor,
                                              const char* unit, uint16_t unitColor) {
     int tempPx = (int)strlen(temp) * 6;
-    _printTextClippedToWeather(x, y, String(temp), tempColor);
-    _printTextClippedToWeather(x + tempPx + NARROW_SPACE_PX, y, String(unit), unitColor);
+    _printTextClippedToWeather(gfx, x, y, String(temp), tempColor);
+    _printTextClippedToWeather(gfx, x + tempPx + NARROW_SPACE_PX, y, String(unit), unitColor);
     return x + tempPx + NARROW_SPACE_PX + 6;
+}
+
+template<typename Gfx>
+static void _blitWeatherCanvas(Gfx& gfx) {
+    for (int py = 0; py < WEATHER_BAND_H; py++) {
+        for (int px = 0; px < DISPLAY_W; px++) {
+            dma_display->drawPixel(px, WEATHER_CLEAR_Y + py, gfx.getPixel(px, py));
+        }
+    }
 }
 
 static void _buildCurrentStr() {
@@ -810,7 +813,8 @@ static void _buildCurrentStr() {
 // Vorhersage idx=0..2 (+1/+2/+3 Tage) statisch, ganzzahlige Temps
 // Format: "Mo +18/-3" zentriert; Tag=Amber, Nacht=Blau
 // yOff: vertikaler Versatz, fade: 0..255 gegen Schwarz
-static void _drawForecastStatic(int idx, int yOff = 0, uint8_t fade = 255) {
+template<typename Gfx>
+static void _drawForecastStatic(Gfx& gfx, int idx, int yOff = 0, uint8_t fade = 255) {
     char dayBuf[6], nightBuf[6];
     const char* unit = (cfg.owm_unit == 0) ? "C" : "F";
     snprintf(dayBuf,   sizeof(dayBuf),   "%+d", (int)roundf(weather.forecast[idx].temp_day));
@@ -824,29 +828,30 @@ static void _drawForecastStatic(int idx, int yOff = 0, uint8_t fade = 255) {
     int dayNamePx = dayName.length() * 6;
     int totalW  = dayNamePx + 6 + dayPx + unitPx + 18 + nightPx + unitPx;
     int x       = max(0, (DISPLAY_W - totalW) / 2);
-    const int y = WEATHER_TEXT_Y + yOff;
+    const int y = WEATHER_BAND_Y + yOff;
     uint16_t warnCol = _fadeColor(C_WARN, fade);
     uint16_t tempCol = _fadeColor(C_TEMP, fade);
     uint16_t infoCol = _fadeColor(C_INFO, fade);
     uint16_t dateCol = _fadeColor(C_DATE, fade);
 
-    dma_display->setTextSize(1);
-    dma_display->setTextColor(warnCol);
-    dma_display->setCursor(x, y);
-    dma_display->print(dayName);
+    gfx.setTextSize(1);
+    gfx.setTextColor(warnCol);
+    gfx.setCursor(x, y);
+    gfx.print(dayName);
     x += dayNamePx + 6;
 
-    x = _drawTempWithUnit(x, y, dayBuf, tempCol, unit, infoCol);
+    x = _drawTempWithUnit(gfx, x, y, dayBuf, tempCol, unit, infoCol);
 
-    dma_display->setTextColor(infoCol);
-    dma_display->setCursor(x, y);
-    dma_display->print(" / ");
+    gfx.setTextColor(infoCol);
+    gfx.setCursor(x, y);
+    gfx.print(" / ");
     x += 18;
 
-    x = _drawTempWithUnit(x, y, nightBuf, dateCol, unit, infoCol);
+    x = _drawTempWithUnit(gfx, x, y, nightBuf, dateCol, unit, infoCol);
 }
 
-static void _drawForecastStaticClippedToWeather(int idx, int yOff, uint8_t fade) {
+template<typename Gfx>
+static void _drawForecastStaticClippedToWeather(Gfx& gfx, int idx, int yOff, uint8_t fade) {
     char dayBuf[6], nightBuf[6];
     const char* unit = (cfg.owm_unit == 0) ? "C" : "F";
     snprintf(dayBuf,   sizeof(dayBuf),   "%+d", (int)roundf(weather.forecast[idx].temp_day));
@@ -859,24 +864,25 @@ static void _drawForecastStaticClippedToWeather(int idx, int yOff, uint8_t fade)
     int dayNamePx = dayName.length() * 6;
     int totalW    = dayNamePx + 6 + dayPx + unitPx + 18 + nightPx + unitPx;
     int x         = max(0, (DISPLAY_W - totalW) / 2);
-    const int y   = WEATHER_TEXT_Y + yOff;
+    const int y   = WEATHER_BAND_Y + yOff;
     uint16_t warnCol = _fadeColor(C_WARN, fade);
     uint16_t tempCol = _fadeColor(C_TEMP, fade);
     uint16_t infoCol = _fadeColor(C_INFO, fade);
     uint16_t dateCol = _fadeColor(C_DATE, fade);
 
-    _printTextClippedToWeather(x, y, dayName, warnCol);
+    _printTextClippedToWeather(gfx, x, y, dayName, warnCol);
     x += dayNamePx + 6;
 
-    x = _drawTempWithUnitClippedToWeather(x, y, dayBuf, tempCol, unit, infoCol);
+    x = _drawTempWithUnitClippedToWeather(gfx, x, y, dayBuf, tempCol, unit, infoCol);
 
-    _printTextClippedToWeather(x, y, String(" / "), infoCol);
+    _printTextClippedToWeather(gfx, x, y, String(" / "), infoCol);
     x += 18;
 
-    x = _drawTempWithUnitClippedToWeather(x, y, nightBuf, dateCol, unit, infoCol);
+    x = _drawTempWithUnitClippedToWeather(gfx, x, y, nightBuf, dateCol, unit, infoCol);
 }
 
-static void _drawForecastTransition(uint32_t now) {
+template<typename Gfx>
+static void _drawForecastTransition(Gfx& gfx, uint32_t now) {
     const uint8_t transitionSteps = 10;
     const uint8_t totalSteps = transitionSteps * 2;
     const uint32_t transitionMs = 20;
@@ -897,10 +903,10 @@ static void _drawForecastTransition(uint32_t now) {
 
     if (!forecastTransitionActive) {
         if (weatherMode == 0) {
-            dma_display->setTextSize(1);
-            _printStrEx(weatherScrollX, WEATHER_TEXT_Y, weatherScrollStr, C_TEMP);
+            gfx.setTextSize(1);
+            _printStrEx(gfx, weatherScrollX, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
         } else {
-            _drawForecastStatic(weatherMode - 1, 0, 255);
+            _drawForecastStatic(gfx, weatherMode - 1, 0, 255);
         }
         return;
     }
@@ -912,9 +918,9 @@ static void _drawForecastTransition(uint32_t now) {
         int outY = -phaseStep;
 
         if (forecastTransitionFrom == 0) {
-            _printStrEx(weatherScrollX, WEATHER_TEXT_Y, weatherScrollStr, _fadeColor(C_TEMP, fadeOut));
+            _printStrEx(gfx, weatherScrollX, WEATHER_BAND_Y, weatherScrollStr, _fadeColor(C_TEMP, fadeOut));
         } else {
-            _drawForecastStaticClippedToWeather(forecastTransitionFrom - 1, outY, fadeOut);
+            _drawForecastStaticClippedToWeather(gfx, forecastTransitionFrom - 1, outY, fadeOut);
         }
         return;
     }
@@ -924,9 +930,9 @@ static void _drawForecastTransition(uint32_t now) {
     int inY = cfg.forecast_scroll_up ? (transitionSteps - phaseStep) : 0;
 
     if (forecastTransitionTo == 0) {
-        _printStrEx(weatherScrollX, WEATHER_TEXT_Y + inY, weatherScrollStr, _fadeColor(C_TEMP, fadeIn));
+        _printStrEx(gfx, weatherScrollX, WEATHER_BAND_Y + inY, weatherScrollStr, _fadeColor(C_TEMP, fadeIn));
     } else {
-        _drawForecastStaticClippedToWeather(forecastTransitionTo - 1, inY, fadeIn);
+        _drawForecastStaticClippedToWeather(gfx, forecastTransitionTo - 1, inY, fadeIn);
     }
 }
 
@@ -941,9 +947,12 @@ static void _drawDateArea(struct tm* t) {
 }
 
 static void _drawWeatherLine() {
+    static GFXcanvas16 weatherCanvas(displayWidth() * 2, WEATHER_BAND_H);
     uint32_t now      = millis();
     uint32_t cyclems  = (uint32_t)cfg.bottom_cycle_sec * 1000UL;
     uint8_t  maxMode  = (weather.valid && !cfg.owm_apikey.isEmpty()) ? 4 : 1;
+
+    weatherCanvas.fillScreen(C_BLACK);
 
     // Erstinitialisierung
     if (weatherScrollStr.isEmpty()) {
@@ -952,7 +961,8 @@ static void _drawWeatherLine() {
     }
 
     if (forecastTransitionActive) {
-        _drawForecastTransition(now);
+        _drawForecastTransition(weatherCanvas, now);
+        _blitWeatherCanvas(weatherCanvas);
         return;
     }
 
@@ -996,13 +1006,14 @@ static void _drawWeatherLine() {
                 }
             }
         }
-        dma_display->setTextSize(1);
-        _printStrEx(weatherScrollX, WEATHER_TEXT_Y, weatherScrollStr, C_TEMP);
+        weatherCanvas.setTextSize(1);
+        _printStrEx(weatherCanvas, weatherScrollX, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
+        _blitWeatherCanvas(weatherCanvas);
         return;
     }
 
     // --- Modi 1-3: Vorhersage mit Ein-/Ausblend-Übergang ---
-    _drawForecastStatic(weatherMode - 1, 0, 255);
+    _drawForecastStatic(weatherCanvas, weatherMode - 1, 0, 255);
     if (now - weatherLastMs >= cyclems) {
         weatherLastMs = now;
         forecastTransitionActive = true;
@@ -1011,6 +1022,7 @@ static void _drawWeatherLine() {
         forecastTransitionStep = 0;
         forecastTransitionMs = now;
     }
+    _blitWeatherCanvas(weatherCanvas);
 }
 
 // ============================================================
@@ -1184,8 +1196,6 @@ void displayUpdate(struct tm* t) {
             _drawDateArea(t);
         }
 
-    // Wetter-Zeile: immer neu (scrollt); ab y-2=21 damit Grossbuchstaben-Umlautpunkte (y-2) geloescht werden
-    dma_display->fillRect(0, WEATHER_CLEAR_Y, DISPLAY_W, DISPLAY_H - WEATHER_CLEAR_Y, C_BLACK);
     _drawWeatherLine();
 
     // AM/PM-Indikator nur im HH:MM-Modus
