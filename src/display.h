@@ -813,21 +813,49 @@ template<typename Gfx>
 static void _blitWeatherCanvas(Gfx& gfx) {
     static GFXcanvas16 prevWeatherCanvas(displayWidth(), WEATHER_BAND_H);
     for (int py = 0; py < WEATHER_BAND_H; py++) {
+        struct Run { int start; int len; uint16_t color; };
+        Run runs[DISPLAY_W];
+        int runCount = 0;
+        int runStart = -1;
+        uint16_t runColor = C_BLACK;
         for (int px = 0; px < DISPLAY_W; px++) {
             uint16_t c0 = gfx.getPixel(px * WEATHER_CANVAS_SCALE_X, py);
             uint16_t c1 = gfx.getPixel(px * WEATHER_CANVAS_SCALE_X + 1, py);
-            uint16_t outColor;
-            if (c0 == c1) {
-                outColor = c0;
-            } else {
+            uint16_t outColor = c0;
+            if (c0 != c1) {
                 uint8_t r = (((c0 >> 11) & 0x1F) + ((c1 >> 11) & 0x1F)) >> 1;
                 uint8_t g = (((c0 >> 5) & 0x3F) + ((c1 >> 5) & 0x3F)) >> 1;
                 uint8_t b = ((c0 & 0x1F) + (c1 & 0x1F)) >> 1;
                 outColor = dma_display->color565(r, g, b);
             }
-            if (prevWeatherCanvas.getPixel(px, py) != outColor) {
-                dma_display->drawPixel(px, WEATHER_CLEAR_Y + py, outColor);
+            if (prevWeatherCanvas.getPixel(px, py) == outColor) {
+                if (runStart >= 0) {
+                    runs[runCount++] = { runStart, px - runStart, runColor };
+                    runStart = -1;
+                }
+            } else {
+                if (runStart < 0) {
+                    runStart = px;
+                    runColor = outColor;
+                } else if (outColor != runColor) {
+                    runs[runCount++] = { runStart, px - runStart, runColor };
+                    runStart = px;
+                    runColor = outColor;
+                }
                 prevWeatherCanvas.drawPixel(px, py, outColor);
+            }
+        }
+        if (runStart >= 0) {
+            runs[runCount++] = { runStart, DISPLAY_W - runStart, runColor };
+        }
+        for (int i = 0; i < runCount; i++) {
+            if (runs[i].color != C_BLACK) {
+                dma_display->drawFastHLine(runs[i].start, WEATHER_CLEAR_Y + py, runs[i].len, runs[i].color);
+            }
+        }
+        for (int i = 0; i < runCount; i++) {
+            if (runs[i].color == C_BLACK) {
+                dma_display->drawFastHLine(runs[i].start, WEATHER_CLEAR_Y + py, runs[i].len, runs[i].color);
             }
         }
     }
