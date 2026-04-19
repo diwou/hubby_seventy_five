@@ -834,7 +834,7 @@ static void _drawForecastTransition(uint32_t now) {
     uint8_t fadeIn  = (uint8_t)(step * 255 / transitionSteps);
     uint8_t fadeOut = (uint8_t)(255 - fadeIn);
     int inY  = cfg.forecast_scroll_up ? (transitionSteps - step) : 0;
-    int outY = cfg.forecast_scroll_up ? -((int)step) : 0;
+    int outY = 0;
 
     _drawForecastStatic(forecastTransitionFrom - 1, outY, fadeOut);
     _drawForecastStatic(forecastTransitionTo   - 1, inY,  fadeIn);
@@ -904,7 +904,7 @@ static void _drawWeatherLine() {
                 forecastTransitionActive = true;
                 forecastTransitionFrom = weatherMode;
                 forecastTransitionTo = (weatherMode % 3) + 1;
-                forecastTransitionStep = 1;
+                forecastTransitionStep = 0;
                 forecastTransitionMs = now;
             }
         } else {
