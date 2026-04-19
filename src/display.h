@@ -840,6 +840,16 @@ static void _drawForecastTransition(uint32_t now) {
     _drawForecastStatic(forecastTransitionTo   - 1, inY,  fadeIn);
 }
 
+static void _drawDateArea(struct tm* t) {
+    if (DISPLAY_W >= 128) {
+        dma_display->fillRect(64, 0, 64, 21, C_BLACK);
+        _drawDateRight(t);
+    } else {
+        dma_display->fillRect(0, 13, 64, 8, C_BLACK);
+        _drawDate(t);
+    }
+}
+
 static void _drawWeatherLine() {
     uint32_t now      = millis();
     uint32_t cyclems  = (uint32_t)cfg.bottom_cycle_sec * 1000UL;
@@ -864,8 +874,6 @@ static void _drawWeatherLine() {
                         weatherLastMs = now;
                         if (maxMode > 1) {
                             weatherMode    = 1;
-                            forecastSlideY = cfg.forecast_scroll_up ? 10 : 0;
-                            forecastSlideMs = now;
                         } else {
                             _buildCurrentStr();  // kein Forecast: neu aufbauen
                         }
@@ -879,8 +887,6 @@ static void _drawWeatherLine() {
                     if (maxMode > 1) {
                         weatherMode    = 1;
                         weatherScrollX = DISPLAY_W;
-                        forecastSlideY = cfg.forecast_scroll_up ? 10 : 0;
-                        forecastSlideMs = now;
                     } else {
                         _buildCurrentStr();
                     }
@@ -898,7 +904,7 @@ static void _drawWeatherLine() {
                 forecastTransitionActive = true;
                 forecastTransitionFrom = weatherMode;
                 forecastTransitionTo = (weatherMode % 3) + 1;
-                forecastTransitionStep = 0;
+                forecastTransitionStep = 1;
                 forecastTransitionMs = now;
             }
         } else {
@@ -1068,21 +1074,18 @@ void displayUpdate(struct tm* t) {
     }
 
     // Datum: nur neu wenn geändert (Dirty-Counter auf Modulebene für displayReset())
-    if (t->tm_mday != datLastMday) { datLastMday = t->tm_mday; datDirty = 2; }
-    if (datDirty > 0) {
-        datDirty--;
-        if (DISPLAY_W >= 128) {
-            dma_display->fillRect(64, 0, 64, 21, C_BLACK);
-            _drawDateRight(t);
-        } else {
-            dma_display->fillRect(0, 13, 64, 8, C_BLACK);
-            _drawDate(t);
+        if (t->tm_mday != datLastMday) { datLastMday = t->tm_mday; datDirty = 2; }
+        if (datDirty > 0) {
+            datDirty--;
+            _drawDateArea(t);
         }
-    }
 
     // Wetter-Zeile: immer neu (scrollt); ab y-2=21 damit Grossbuchstaben-Umlautpunkte (y-2) geloescht werden
     dma_display->fillRect(0, 21, DISPLAY_W, 11, C_BLACK);
     _drawWeatherLine();
+    if (forecastTransitionActive) {
+        _drawDateArea(t);
+    }
 
     // AM/PM-Indikator nur im HH:MM-Modus
     if (cfg.time_12h && cfg.seconds_mode != 3) {
