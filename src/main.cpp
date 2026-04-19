@@ -7,7 +7,6 @@
 
 #include <Arduino.h>
 #include <esp_system.h>
-#include <esp_task_wdt.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <LittleFS.h>
@@ -27,23 +26,36 @@ uint32_t lastWeatherFetch  = 0;
 uint32_t lastReconnectMs   = 0;
 bool     wifiConnected     = false;
 String   lastStatusMsg     = "";
-static constexpr uint32_t WATCHDOG_TIMEOUT_SEC = 30;
-static bool watchdogArmed = false;
+static constexpr uint32_t WATCHDOG_TIMEOUT_MS = 60000UL;
+static volatile uint32_t watchdogLastKickMs = 0;
+static TaskHandle_t watchdogTaskHandle = nullptr;
 
 void appWatchdogFeed() {
-    if (watchdogArmed) {
-        esp_task_wdt_reset();
-    }
+    watchdogLastKickMs = millis();
 }
 
 static void setupWatchdog() {
-    if (esp_task_wdt_init(WATCHDOG_TIMEOUT_SEC, true) == ESP_OK) {
-        esp_task_wdt_add(NULL);
-        watchdogArmed = true;
-        Serial.printf("[WDT] Aktiviert (%lu s)\n", (unsigned long)WATCHDOG_TIMEOUT_SEC);
-    } else {
-        Serial.println("[WDT] Init fehlgeschlagen.");
-    }
+    watchdogLastKickMs = millis();
+    xTaskCreatePinnedToCore(
+        [](void*) {
+            for (;;) {
+                uint32_t age = millis() - watchdogLastKickMs;
+                if (age > WATCHDOG_TIMEOUT_MS) {
+                    Serial.printf("[WDT] Kein Heartbeat seit %lu ms, Neustart...\n",
+                                  (unsigned long)age);
+                    delay(100);
+                    ESP.restart();
+                }
+                vTaskDelay(pdMS_TO_TICKS(1000));
+            }
+        },
+        "appWDT",
+        2048,
+        nullptr,
+        1,
+        &watchdogTaskHandle,
+        0);
+    Serial.printf("[WDT] Monitor aktiv (%lu ms)\n", (unsigned long)WATCHDOG_TIMEOUT_MS);
 }
 
 static const char* resetReasonName(esp_reset_reason_t reason) {
