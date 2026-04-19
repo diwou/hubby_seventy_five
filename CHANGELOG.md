@@ -13,6 +13,10 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ## [1.6.2] - 2026-04-19
 
 ### Fixed
+- Der neue Heartbeat-Watchdog prueft jetzt sauber, ob sein Task wirklich gestartet wurde. Wenn die Task-Erzeugung fehlschlaegt, wird das auch als Fehler gemeldet statt stillschweigend als aktiv zu gelten.
+- OTA gibt die Display-Sperre nach einem erfolgreichen Abschluss jetzt wieder frei, damit ein verzögerter Neustart nicht auf einem dauerhaft blockierten Display endet.
+- Die Kurz-BOM in `kicad/README.md` wird jetzt direkt aus `kicad/fab/rev0.2/bom/bom.csv` generiert, zeigt jetzt auch die Bauformen mit an und kann mit `scripts/render_kicad_bom_summary.py --write-readme` reproduzierbar aktualisiert werden.
+- Die BOM-Übersicht nennt jetzt explizit, dass `U5` ein ESP32-S3-WROOM-1 mit PSRAM sein muss.
 - Statusbilder, die die Matrix kurz loeschen, markieren nun die statischen Uhr- und Datumsbereiche wieder als dirty. Dadurch kommen Uhrzeit, Datum und Wochentag nach einer kurzen NTP-/WLAN-Stoerung sofort komplett zurueck und bleiben nicht bis zur naechsten echten Aenderung leer [`572f1c1`]
 - Vorhersage-Kacheln wechseln jetzt als Uebergang nach oben weg: Die aktuelle Kachel faehrt und blendet nach oben aus, waehrend die naechste von unten einfaehrt und dabei eingeblendet wird [`200baba`]
 - Der neue Vorhersage-Uebergang baut jetzt sauber ohne alte `forecastSlide*`-Reste und wurde mit `pio run` erfolgreich kompiliert.
@@ -28,7 +32,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Monitor-Watchdog ergänzt: Ein eigener FreeRTOS-Task ueberwacht jetzt den Heartbeat des Hauptpfads und startet das Geraet neu, wenn es wirklich haengt. OTA bleibt dabei aktiv, weil der Monitor nicht auf `esp_task_wdt` des Loop-Tasks angewiesen ist.
 - OTA-Watchdog-Falle beseitigt: Waehrend eines Firmware-Uploads fuettern jetzt die `ArduinoOTA`-Callbacks den Heartbeat mit, damit der Upload nicht selbst als Hänger endet.
 - KiCad-Projekt und Fertigungsdaten ins Repo einsortiert: `kicad/source/` enthält die Bearbeitungsquellen fuer Revision `0.2`, `kicad/fab/rev0.2/` die Gerber-, BOM- und Bestell-Artefakte; das komplette Fertigungspaket liegt dort direkt als ZIP, lokale Backups und Cache-Dateien bleiben per `.gitignore` ausgeschlossen.
-- In `kicad/README.md` steht jetzt eine kleine lesbare Kurz-BOM aus der exportierten CSV, damit man ohne KiCad sofort die wichtigsten Bestückungsgruppen sieht.
+- In `kicad/README.md` steht jetzt eine kleine lesbare Kurz-BOM aus der exportierten CSV, damit man ohne KiCad sofort die wichtigsten Bestückungsgruppen sieht; ein kleiner Generator liegt in `scripts/render_kicad_bom_summary.py`.
 
 ## [1.6.1] - 2026-04-11
 

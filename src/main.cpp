@@ -36,7 +36,7 @@ void appWatchdogFeed() {
 
 static void setupWatchdog() {
     watchdogLastKickMs = millis();
-    xTaskCreatePinnedToCore(
+    BaseType_t rc = xTaskCreatePinnedToCore(
         [](void*) {
             for (;;) {
                 uint32_t age = millis() - watchdogLastKickMs;
@@ -55,6 +55,11 @@ static void setupWatchdog() {
         1,
         &watchdogTaskHandle,
         0);
+    if (rc != pdPASS || watchdogTaskHandle == nullptr) {
+        watchdogTaskHandle = nullptr;
+        Serial.println("[WDT] Monitor konnte nicht gestartet werden");
+        return;
+    }
     Serial.printf("[WDT] Monitor aktiv (%lu ms)\n", (unsigned long)WATCHDOG_TIMEOUT_MS);
 }
 

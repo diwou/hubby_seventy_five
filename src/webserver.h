@@ -743,6 +743,8 @@ void webServerSetup() {
                     return;
                 }
                 webUpdateOk = true;
+                otaRunning = false;
+                displaySetOtaActive(false);
                 Serial.println("[WebUpdate] Erfolgreich, Neustart folgt.");
             }
         }
@@ -772,6 +774,7 @@ void otaSetup() {
     ArduinoOTA.onEnd([]()   {
         appWatchdogFeed();
         otaRunning = false;
+        displaySetOtaActive(false);
     });
     ArduinoOTA.onError([](ota_error_t) {
         appWatchdogFeed();
