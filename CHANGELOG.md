@@ -22,6 +22,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Wetterkreislauf erneut gefixt: Der Forecast-Zyklus kehrt nach dem dritten Tag wieder zum aktuellen Wetterlaufband zurueck, und der vertikale Uebergang bleibt dabei auf den Wetterbereich begrenzt, damit nichts mehr in die Uhrzeit hineinragt [`39f6d34`]
 - Forecast-Animation weiter entkoppelt: Erst blendet die alte Zeile komplett aus, erst danach faehrt die neue von unten ein. Damit ueberlagern sich Aus- und Einblenden nicht mehr [`2be3e2a`]
 - Nach dem Praxistest wurde der vertikale Abstieg des alten Forecasts wieder auf den unteren Wetterstreifen begrenzt, damit er auf dem Einzelpanel nicht mehr in die Uhrzeit hineinragt [`5f48c5d`]
+- Wenn der Forecast uebergangsweise in die oberen Zeilen hineinragt, wird die Uhrzeit direkt danach noch einmal frisch gezeichnet, damit der obere Bereich auf 1x und 2x HUB75 sauber bleibt [`b71d805`]
 
 ## [1.6.1] - 2026-04-11
 
