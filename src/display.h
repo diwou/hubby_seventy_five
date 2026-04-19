@@ -789,25 +789,9 @@ static void _blitWeatherCanvas(Gfx& gfx) {
 }
 
 template<typename Gfx>
-static void _drawSoftScrollText(Gfx& gfx, int x, int y, const String& s, uint16_t color, uint8_t phase) {
-    uint8_t lead  = (uint8_t)(255 - phase);
-    uint8_t trail = phase;
-
-    _printStrEx(gfx, x,     y, s, _fadeColor(color, lead));
-    if (trail > 0) {
-        _printStrEx(gfx, x - 1, y, s, _fadeColor(color, trail));
-    }
-}
-
-template<typename Gfx>
 static void _drawInterpolatedScrollText(Gfx& gfx, int32_t x256, int y, const String& s, uint16_t color) {
-    int xBase = (int)(x256 >> 8);
-    uint8_t frac = (uint8_t)(x256 & 0xFF);
-
-    _printStrEx(gfx, xBase, y, s, _fadeColor(color, (uint8_t)(255 - frac)));
-    if (frac > 0) {
-        _printStrEx(gfx, xBase - 1, y, s, _fadeColor(color, frac));
-    }
+    int xRounded = (int)((x256 + 128) >> 8);
+    _printStrEx(gfx, xRounded, y, s, color);
 }
 
 static void _buildCurrentStr() {
