@@ -111,8 +111,7 @@ void displayInit() {
         DisplayPins::PIN_A, DisplayPins::PIN_B, DisplayPins::PIN_C, DisplayPins::PIN_D, -1,
         DisplayPins::PIN_LAT, DisplayPins::PIN_OE, DisplayPins::PIN_CLK
     };
-    // Einzeln gepufferter Treiber: der Wetterbereich wird pro Frame komplett
-    // neu aufgebaut, damit keine inkonsistenten Zwischenbilder stehen bleiben.
+    // double_buff=false: mit 2 Panels reicht der DMA-Speicher (internes SRAM) nicht fuer double buffering
     HUB75_I2S_CFG mxconfig(PANEL_W, PANEL_H, DISPLAY_PANELS, pinmap, HUB75_I2S_CFG::FM6126A,
                            HUB75_I2S_CFG::TYPE138, false);
     (void)displayPanelMapping(); // vorbereitet fuer spaetere 2x2-/ZigZag-Mapping-Unterstuetzung
@@ -188,7 +187,6 @@ static constexpr int DIGIT_VISIBLE_H_HHMM   = 16;
 static constexpr int DIGIT_VISIBLE_H_HHMMSS = 14;
 static constexpr char NARROW_SPACE_MARKER   = '\x1f';
 static constexpr int  NARROW_SPACE_PX       = 3;
-static constexpr int  WEATHER_CANVAS_SCALE_X = 2;
 
 // ============================================================
 // Bitmap-Font 10×14: modern, bold (3px horizontal, 2px vertikal)
@@ -659,7 +657,7 @@ static void _drawDateRight(struct tm* t) {
 // ============================================================
 static uint8_t   weatherMode      = 0;
 static uint32_t  weatherLastMs    = 0;
-static int32_t   weatherScrollX256 = (int32_t)DISPLAY_W << 8;
+static int       weatherScrollX   = DISPLAY_W;
 static uint32_t  weatherScrollMs  = 0;
 static String    weatherScrollStr = "";
 static bool      forecastTransitionActive = false;
@@ -751,39 +749,15 @@ static int _printStrEx(Gfx& gfx, int x, int y, const String& s, uint16_t color) 
 }
 
 template<typename Gfx>
-static void _drawCharEx2x(Gfx& gfx, int x, int y, uint8_t c, uint16_t color) {
-    static GFXcanvas16 glyphCanvas(12, 10);
-    glyphCanvas.fillScreen(C_BLACK);
-    _drawCharEx(glyphCanvas, 0, 2, c, color);
-
-    for (int sy = 0; sy < 10; sy++) {
-        for (int sx = 0; sx < 12; sx++) {
-            if (glyphCanvas.getPixel(sx, sy) == C_BLACK) continue;
-            int dx = x + sx * WEATHER_CANVAS_SCALE_X;
-            int dy = y + sy - 2;
-            gfx.drawPixel(dx, dy, color);
-            gfx.drawPixel(dx + 1, dy, color);
-        }
-    }
-}
-
-template<typename Gfx>
-static int _printStrEx2x(Gfx& gfx, int x, int y, const String& s, uint16_t color) {
-    const uint8_t* p = (const uint8_t*)s.c_str();
-    while (*p) {
-        uint8_t c = *p++;
-        _drawCharEx2x(gfx, x, y, c, color);
-        x += _glyphAdvance(c) * WEATHER_CANVAS_SCALE_X;
-    }
-    return x;
-}
-
-template<typename Gfx>
 static int _drawTempWithUnit(Gfx& gfx, int x, int y, const char* temp, uint16_t tempColor,
                              const char* unit, uint16_t unitColor) {
     int tempPx = (int)strlen(temp) * 6;
-    _printStrEx2x(gfx, x * WEATHER_CANVAS_SCALE_X, y, String(temp), tempColor);
-    _printStrEx2x(gfx, (x + tempPx + NARROW_SPACE_PX) * WEATHER_CANVAS_SCALE_X, y, String(unit), unitColor);
+    gfx.setTextColor(tempColor);
+    gfx.setCursor(x, y);
+    gfx.print(temp);
+    gfx.setTextColor(unitColor);
+    gfx.setCursor(x + tempPx + NARROW_SPACE_PX, y);
+    gfx.print(unit);
     return x + tempPx + NARROW_SPACE_PX + 6;
 }
 
@@ -797,16 +771,11 @@ static void _printTextClippedToWeather(Gfx& gfx, int x, int y, const String& s, 
 }
 
 template<typename Gfx>
-static void _printTextClippedToWeather2x(Gfx& gfx, int x, int y, const String& s, uint16_t color) {
-    _printStrEx2x(gfx, x * WEATHER_CANVAS_SCALE_X, y, s, color);
-}
-
-template<typename Gfx>
 static int _drawTempWithUnitClippedToWeather(Gfx& gfx, int x, int y, const char* temp, uint16_t tempColor,
                                              const char* unit, uint16_t unitColor) {
     int tempPx = (int)strlen(temp) * 6;
-    _printStrEx2x(gfx, x * WEATHER_CANVAS_SCALE_X, y, String(temp), tempColor);
-    _printStrEx2x(gfx, (x + tempPx + NARROW_SPACE_PX) * WEATHER_CANVAS_SCALE_X, y, String(unit), unitColor);
+    _printTextClippedToWeather(gfx, x, y, String(temp), tempColor);
+    _printTextClippedToWeather(gfx, x + tempPx + NARROW_SPACE_PX, y, String(unit), unitColor);
     return x + tempPx + NARROW_SPACE_PX + 6;
 }
 
@@ -814,24 +783,9 @@ template<typename Gfx>
 static void _blitWeatherCanvas(Gfx& gfx) {
     for (int py = 0; py < WEATHER_BAND_H; py++) {
         for (int px = 0; px < DISPLAY_W; px++) {
-            uint16_t c0 = gfx.getPixel(px * WEATHER_CANVAS_SCALE_X, py);
-            uint16_t c1 = gfx.getPixel(px * WEATHER_CANVAS_SCALE_X + 1, py);
-            uint16_t outColor = c0;
-            if (c0 != c1) {
-                uint8_t r = (((c0 >> 11) & 0x1F) + ((c1 >> 11) & 0x1F)) >> 1;
-                uint8_t g = (((c0 >> 5) & 0x3F) + ((c1 >> 5) & 0x3F)) >> 1;
-                uint8_t b = ((c0 & 0x1F) + (c1 & 0x1F)) >> 1;
-                outColor = dma_display->color565(r, g, b);
-            }
-            dma_display->drawPixel(px, WEATHER_CLEAR_Y + py, outColor);
+            dma_display->drawPixel(px, WEATHER_CLEAR_Y + py, gfx.getPixel(px, py));
         }
     }
-}
-
-template<typename Gfx>
-static void _drawInterpolatedScrollText(Gfx& gfx, int32_t x256, int y, const String& s, uint16_t color) {
-    int xCanvas = (int)((x256 + 64) >> 7);
-    _printStrEx2x(gfx, xCanvas, y, s, color);
 }
 
 static void _buildCurrentStr() {
@@ -881,12 +835,16 @@ static void _drawForecastStatic(Gfx& gfx, int idx, int yOff = 0, uint8_t fade = 
     uint16_t dateCol = _fadeColor(C_DATE, fade);
 
     gfx.setTextSize(1);
-    _printTextClippedToWeather2x(gfx, x, y, dayName, warnCol);
+    gfx.setTextColor(warnCol);
+    gfx.setCursor(x, y);
+    gfx.print(dayName);
     x += dayNamePx + 6;
 
     x = _drawTempWithUnit(gfx, x, y, dayBuf, tempCol, unit, infoCol);
 
-    _printTextClippedToWeather2x(gfx, x, y, String(" / "), infoCol);
+    gfx.setTextColor(infoCol);
+    gfx.setCursor(x, y);
+    gfx.print(" / ");
     x += 18;
 
     x = _drawTempWithUnit(gfx, x, y, nightBuf, dateCol, unit, infoCol);
@@ -912,12 +870,12 @@ static void _drawForecastStaticClippedToWeather(Gfx& gfx, int idx, int yOff, uin
     uint16_t infoCol = _fadeColor(C_INFO, fade);
     uint16_t dateCol = _fadeColor(C_DATE, fade);
 
-    _printTextClippedToWeather2x(gfx, x, y, dayName, warnCol);
+    _printTextClippedToWeather(gfx, x, y, dayName, warnCol);
     x += dayNamePx + 6;
 
     x = _drawTempWithUnitClippedToWeather(gfx, x, y, dayBuf, tempCol, unit, infoCol);
 
-    _printTextClippedToWeather2x(gfx, x, y, String(" / "), infoCol);
+    _printTextClippedToWeather(gfx, x, y, String(" / "), infoCol);
     x += 18;
 
     x = _drawTempWithUnitClippedToWeather(gfx, x, y, nightBuf, dateCol, unit, infoCol);
@@ -937,8 +895,7 @@ static void _drawForecastTransition(Gfx& gfx, uint32_t now) {
             weatherLastMs = now;
             if (weatherMode == 0) {
                 _buildCurrentStr();
-                weatherScrollMs = now;
-                weatherScrollX256 = (int32_t)DISPLAY_W << 8;
+                weatherScrollX = DISPLAY_W;
             }
             break;
         }
@@ -947,7 +904,7 @@ static void _drawForecastTransition(Gfx& gfx, uint32_t now) {
     if (!forecastTransitionActive) {
         if (weatherMode == 0) {
             gfx.setTextSize(1);
-            _drawInterpolatedScrollText(gfx, weatherScrollX256, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
+            _printStrEx(gfx, weatherScrollX, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
         } else {
             _drawForecastStatic(gfx, weatherMode - 1, 0, 255);
         }
@@ -961,7 +918,7 @@ static void _drawForecastTransition(Gfx& gfx, uint32_t now) {
         int outY = -phaseStep;
 
         if (forecastTransitionFrom == 0) {
-            _drawInterpolatedScrollText(gfx, weatherScrollX256, WEATHER_BAND_Y, weatherScrollStr, _fadeColor(C_TEMP, fadeOut));
+            _printStrEx(gfx, weatherScrollX, WEATHER_BAND_Y, weatherScrollStr, _fadeColor(C_TEMP, fadeOut));
         } else {
             _drawForecastStaticClippedToWeather(gfx, forecastTransitionFrom - 1, outY, fadeOut);
         }
@@ -973,7 +930,7 @@ static void _drawForecastTransition(Gfx& gfx, uint32_t now) {
     int inY = cfg.forecast_scroll_up ? (transitionSteps - phaseStep) : 0;
 
     if (forecastTransitionTo == 0) {
-        _drawInterpolatedScrollText(gfx, weatherScrollX256, WEATHER_BAND_Y + inY, weatherScrollStr, _fadeColor(C_TEMP, fadeIn));
+        _printStrEx(gfx, weatherScrollX, WEATHER_BAND_Y + inY, weatherScrollStr, _fadeColor(C_TEMP, fadeIn));
     } else {
         _drawForecastStaticClippedToWeather(gfx, forecastTransitionTo - 1, inY, fadeIn);
     }
@@ -1001,8 +958,6 @@ static void _drawWeatherLine() {
     if (weatherScrollStr.isEmpty()) {
         weatherLastMs = now;
         _buildCurrentStr();
-        weatherScrollMs = now;
-        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
     }
 
     if (forecastTransitionActive) {
@@ -1013,16 +968,13 @@ static void _drawWeatherLine() {
 
     if (weatherMode == 0) {
         // --- Modus 0: aktuelles Wetter scrollend ---
-        uint32_t scrollStepMs = (cfg.scroll_speed_ms == 0) ? 1UL : (uint32_t)cfg.scroll_speed_ms;
-        uint32_t scrollElapsed = now - weatherScrollMs;
-        if (scrollElapsed > 0) {
+        if (now - weatherScrollMs >= cfg.scroll_speed_ms) {
             weatherScrollMs = now;
             int textPx = _textWidthEx(weatherScrollStr);
             if (textPx > DISPLAY_W - 4) {
-                int32_t deltaX256 = (int32_t)(((uint64_t)scrollElapsed * 256UL) / scrollStepMs);
-                weatherScrollX256 -= deltaX256;
-                if ((weatherScrollX256 >> 8) < -textPx) {
-                    weatherScrollX256 = (int32_t)(-textPx) << 8;  // einfrieren
+                weatherScrollX--;
+                if (weatherScrollX < -textPx) {
+                    weatherScrollX = -textPx;  // einfrieren
                     if (now - weatherLastMs >= cyclems) {
                         weatherLastMs = now;
                         if (maxMode > 1) {
@@ -1034,12 +986,11 @@ static void _drawWeatherLine() {
                         } else {
                             _buildCurrentStr();  // kein Forecast: neu aufbauen
                         }
-                        weatherScrollMs = now;
-                        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
+                        weatherScrollX = DISPLAY_W;
                     }
                 }
             } else {
-                weatherScrollX256 = (int32_t)((DISPLAY_W - textPx) / 2) << 8;
+                weatherScrollX = (DISPLAY_W - textPx) / 2;
                 if (now - weatherLastMs >= cyclems) {
                     weatherLastMs = now;
                     if (maxMode > 1) {
@@ -1048,17 +999,15 @@ static void _drawWeatherLine() {
                         forecastTransitionTo = 1;
                         forecastTransitionStep = 0;
                         forecastTransitionMs = now;
-                        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
+                        weatherScrollX = DISPLAY_W;
                     } else {
                         _buildCurrentStr();
-                        weatherScrollMs = now;
-                        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
                     }
                 }
             }
         }
         weatherCanvas.setTextSize(1);
-        _drawInterpolatedScrollText(weatherCanvas, weatherScrollX256, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
+        _printStrEx(weatherCanvas, weatherScrollX, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
         _blitWeatherCanvas(weatherCanvas);
         return;
     }
@@ -1173,7 +1122,7 @@ void displayReset() {
     }
     colonFrame = -1; colonFrameMs = 0; colonLastSec = -1;
     weatherMode = 0; weatherLastMs = 0;
-    weatherScrollX256 = (int32_t)DISPLAY_W << 8; weatherScrollMs = 0;
+    weatherScrollX = DISPLAY_W; weatherScrollMs = 0;
     weatherScrollStr = "";
     forecastTransitionActive = false;
     forecastTransitionFrom = 1;
