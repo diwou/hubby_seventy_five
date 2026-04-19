@@ -111,9 +111,10 @@ void displayInit() {
         DisplayPins::PIN_A, DisplayPins::PIN_B, DisplayPins::PIN_C, DisplayPins::PIN_D, -1,
         DisplayPins::PIN_LAT, DisplayPins::PIN_OE, DisplayPins::PIN_CLK
     };
-    // double_buff=false: mit 2 Panels reicht der DMA-Speicher (internes SRAM) nicht fuer double buffering
+    // Mit PSRAM auf dem S3 kann der Treiber doppelt puffern; dadurch werden
+    // sichtbare Teilupdates beim Weather-Refresh vermieden.
     HUB75_I2S_CFG mxconfig(PANEL_W, PANEL_H, DISPLAY_PANELS, pinmap, HUB75_I2S_CFG::FM6126A,
-                           HUB75_I2S_CFG::TYPE138, false);
+                           HUB75_I2S_CFG::TYPE138, true);
     (void)displayPanelMapping(); // vorbereitet fuer spaetere 2x2-/ZigZag-Mapping-Unterstuetzung
 
     dma_display = new MatrixPanel_I2S_DMA(mxconfig);
