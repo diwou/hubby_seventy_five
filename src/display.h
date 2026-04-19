@@ -664,6 +664,13 @@ static int       datLastMday  = -1;
 static uint8_t   datDirty     = 2;
 static bool      displayOtaActive = false;
 
+static void _invalidateStaticDisplay() {
+    for (int i = 0; i < 6; i++) {
+        digitDirty[i] = 2;
+    }
+    datDirty = 2;
+}
+
 // ============================================================
 // Umlaut-fähige Text-Ausgabe (ersetzt dma_display->print für
 // Strings die Latin-1-Umlaute aus _sanitizeUtf8 enthalten können)
@@ -862,10 +869,12 @@ static void _drawWeatherLine() {
 // ============================================================
 void displaySetOtaActive(bool active) {
     displayOtaActive = active;
+    if (!active) _invalidateStaticDisplay();
 }
 
 void displayShowOTA(uint32_t progress, uint32_t total) {
     displayOtaActive = true;
+    _invalidateStaticDisplay();
     dma_display->clearScreen();
     dma_display->setTextSize(1);
     dma_display->setTextColor(C_WARN);
@@ -893,6 +902,7 @@ void displayShowOTA(uint32_t progress, uint32_t total) {
 // Scrolling-Text fürs Setup (IP-Anzeige)
 // ============================================================
 void displayScrollText(const String& text, uint16_t color, int speed_ms) {
+    _invalidateStaticDisplay();
     int pixelLen = text.length() * 6;
     for (int x = DISPLAY_W; x > -(pixelLen); x--) {
         dma_display->clearScreen();
@@ -912,6 +922,7 @@ void displayScrollText(const String& text, uint16_t color, int speed_ms) {
 // AP-Modus-Anzeige
 // ============================================================
 void displayShowAP(const String& ssid, const String& ip) {
+    _invalidateStaticDisplay();
     dma_display->clearScreen();
     dma_display->setTextSize(1);
     dma_display->setTextWrap(false);
@@ -927,6 +938,7 @@ void displayShowAP(const String& ssid, const String& ip) {
 }
 
 void displayShowMessage(const String& msg, uint16_t color) {
+    _invalidateStaticDisplay();
     dma_display->fillRect(0, 11, DISPLAY_W, 21, C_BLACK);
     dma_display->setTextSize(1);
     dma_display->setTextColor(color);
