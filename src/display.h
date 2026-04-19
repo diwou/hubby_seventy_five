@@ -811,19 +811,24 @@ static int _drawTempWithUnitClippedToWeather(Gfx& gfx, int x, int y, const char*
 
 template<typename Gfx>
 static void _blitWeatherCanvas(Gfx& gfx) {
+    static GFXcanvas16 prevWeatherCanvas(displayWidth(), WEATHER_BAND_H);
     for (int py = 0; py < WEATHER_BAND_H; py++) {
         for (int px = 0; px < DISPLAY_W; px++) {
             uint16_t c0 = gfx.getPixel(px * WEATHER_CANVAS_SCALE_X, py);
             uint16_t c1 = gfx.getPixel(px * WEATHER_CANVAS_SCALE_X + 1, py);
+            uint16_t outColor;
             if (c0 == c1) {
-                dma_display->drawPixel(px, WEATHER_CLEAR_Y + py, c0);
-                continue;
+                outColor = c0;
+            } else {
+                uint8_t r = (((c0 >> 11) & 0x1F) + ((c1 >> 11) & 0x1F)) >> 1;
+                uint8_t g = (((c0 >> 5) & 0x3F) + ((c1 >> 5) & 0x3F)) >> 1;
+                uint8_t b = ((c0 & 0x1F) + (c1 & 0x1F)) >> 1;
+                outColor = dma_display->color565(r, g, b);
             }
-            uint8_t r = (((c0 >> 11) & 0x1F) + ((c1 >> 11) & 0x1F)) >> 1;
-            uint8_t g = (((c0 >> 5) & 0x3F) + ((c1 >> 5) & 0x3F)) >> 1;
-            uint8_t b = ((c0 & 0x1F) + (c1 & 0x1F)) >> 1;
-            dma_display->drawPixel(px, WEATHER_CLEAR_Y + py,
-                                   dma_display->color565(r, g, b));
+            if (prevWeatherCanvas.getPixel(px, py) != outColor) {
+                dma_display->drawPixel(px, WEATHER_CLEAR_Y + py, outColor);
+                prevWeatherCanvas.drawPixel(px, py, outColor);
+            }
         }
     }
 }
