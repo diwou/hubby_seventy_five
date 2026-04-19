@@ -13,7 +13,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ## [1.6.2] - 2026-04-19
 
 ### Fixed
-- Die Wetterzeile wird jetzt intern doppelt breit gerendert und erst am Ende auf die Matrix übertragen, damit das Scrollen auch bei kleinen Loop-Schwankungen ruhiger bleibt [`e1b5117`]
+- Die Wetterzeile wird jetzt intern doppelt breit gerendert und erst am Ende auf die Matrix übertragen, damit das Scrollen auch bei kleinen Loop-Schwankungen ruhiger bleibt [`075ad7e`]
 - Der neue Heartbeat-Watchdog prueft jetzt sauber, ob sein Task wirklich gestartet wurde. Wenn die Task-Erzeugung fehlschlaegt, wird das auch als Fehler gemeldet statt stillschweigend als aktiv zu gelten [`bf68486`]
 - Der Watchdog meldet beim Ausloesen jetzt auch die zuletzt aktive Programmpassage, damit sich echte Hänger schneller von harmlosen Zwischenzuständen unterscheiden lassen [`bf68486`]
 - Die Watchdog-Hängermeldung ist jetzt auch im Webinterface sichtbar, inklusive Phase, Dauer und aktuellem Boot-Grund [`4e40a41`]
