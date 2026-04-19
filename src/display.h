@@ -821,6 +821,10 @@ static void _drawForecastTransition(uint32_t now) {
             forecastTransitionActive = false;
             weatherMode = forecastTransitionTo;
             weatherLastMs = now;
+            if (weatherMode == 0) {
+                _buildCurrentStr();
+                weatherScrollX = DISPLAY_W;
+            }
             break;
         }
     }
@@ -834,10 +838,15 @@ static void _drawForecastTransition(uint32_t now) {
     uint8_t fadeIn  = (uint8_t)(step * 255 / transitionSteps);
     uint8_t fadeOut = (uint8_t)(255 - fadeIn);
     int inY  = cfg.forecast_scroll_up ? (transitionSteps - step) : 0;
-    int outY = 0;
+    int outY = (forecastTransitionFrom == 0) ? 0 : (cfg.forecast_scroll_up ? -((int)step) : 0);
 
-    _drawForecastStatic(forecastTransitionFrom - 1, outY, fadeOut);
-    _drawForecastStatic(forecastTransitionTo   - 1, inY,  fadeIn);
+    if (forecastTransitionFrom == 0) {
+        dma_display->setTextSize(1);
+        _printStrEx(weatherScrollX, 23, weatherScrollStr, _fadeColor(C_TEMP, fadeOut));
+    } else {
+        _drawForecastStatic(forecastTransitionFrom - 1, outY, fadeOut);
+    }
+    _drawForecastStatic(forecastTransitionTo - 1, inY, fadeIn);
 }
 
 static void _drawDateArea(struct tm* t) {
@@ -861,7 +870,9 @@ static void _drawWeatherLine() {
         _buildCurrentStr();
     }
 
-    if (weatherMode == 0) {
+    if (forecastTransitionActive) {
+        _drawForecastTransition(now);
+    } else if (weatherMode == 0) {
         // --- Modus 0: aktuelles Wetter scrollend ---
         if (now - weatherScrollMs >= cfg.scroll_speed_ms) {
             weatherScrollMs = now;
@@ -873,7 +884,11 @@ static void _drawWeatherLine() {
                     if (now - weatherLastMs >= cyclems) {
                         weatherLastMs = now;
                         if (maxMode > 1) {
-                            weatherMode    = 1;
+                            forecastTransitionActive = true;
+                            forecastTransitionFrom = 0;
+                            forecastTransitionTo = 1;
+                            forecastTransitionStep = 0;
+                            forecastTransitionMs = now;
                         } else {
                             _buildCurrentStr();  // kein Forecast: neu aufbauen
                         }
@@ -885,7 +900,11 @@ static void _drawWeatherLine() {
                 if (now - weatherLastMs >= cyclems) {
                     weatherLastMs = now;
                     if (maxMode > 1) {
-                        weatherMode    = 1;
+                        forecastTransitionActive = true;
+                        forecastTransitionFrom = 0;
+                        forecastTransitionTo = 1;
+                        forecastTransitionStep = 0;
+                        forecastTransitionMs = now;
                         weatherScrollX = DISPLAY_W;
                     } else {
                         _buildCurrentStr();
@@ -897,7 +916,9 @@ static void _drawWeatherLine() {
         _printStrEx(weatherScrollX, 23, weatherScrollStr, C_TEMP);
     } else {
         // --- Modi 1-3: Vorhersage mit Ein-/Ausblend-Übergang ---
-        if (!forecastTransitionActive) {
+        if (weatherMode == 0) {
+            _printStrEx(weatherScrollX, 23, weatherScrollStr, C_TEMP);
+        } else if (!forecastTransitionActive) {
             _drawForecastStatic(weatherMode - 1, 0, 255);
             if (now - weatherLastMs >= cyclems) {
                 weatherLastMs = now;
@@ -907,8 +928,6 @@ static void _drawWeatherLine() {
                 forecastTransitionStep = 0;
                 forecastTransitionMs = now;
             }
-        } else {
-            _drawForecastTransition(now);
         }
     }
 }
