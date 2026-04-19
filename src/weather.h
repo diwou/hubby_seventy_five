@@ -5,6 +5,8 @@
 #include <WiFi.h>
 #include "config.h"
 
+extern void appWatchdogFeed();
+
 // ============================================================
 // Wetter-Datenstruktur
 // ============================================================
@@ -142,7 +144,9 @@ static HttpResult _httpGet(const String& url) {
         return result;
     }
 
+    appWatchdogFeed();
     result.code = http.GET();
+    appWatchdogFeed();
     if (result.code == 200) {
         result.body = http.getString();
     } else if (result.code > 0) {
@@ -152,6 +156,7 @@ static HttpResult _httpGet(const String& url) {
     }
 
     http.end();
+    appWatchdogFeed();
     return result;
 }
 

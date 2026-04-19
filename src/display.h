@@ -5,6 +5,8 @@
 #include "config.h"
 #include "weather.h"
 
+extern void appWatchdogFeed();
+
 // ============================================================
 // Display-Instanz
 // ============================================================
@@ -97,6 +99,7 @@ static void displayRampBrightness(uint8_t targetBrightness,
         uint8_t level = startBrightness +
                         (uint16_t)(targetBrightness - startBrightness) * step / steps;
         displaySetBrightness(level);
+        appWatchdogFeed();
         delay(stepMs);
     }
 }
@@ -1051,6 +1054,7 @@ void displayScrollText(const String& text, uint16_t color, int speed_ms) {
     _invalidateStaticDisplay();
     int pixelLen = text.length() * 6;
     for (int x = DISPLAY_W; x > -(pixelLen); x--) {
+        appWatchdogFeed();
         dma_display->clearScreen();
         dma_display->setTextSize(1);
         dma_display->setTextColor(C_DATE);
@@ -1060,6 +1064,7 @@ void displayScrollText(const String& text, uint16_t color, int speed_ms) {
         dma_display->setCursor(x, 13);
         dma_display->print(text);
         dma_display->flipDMABuffer();
+        appWatchdogFeed();
         delay(speed_ms);
     }
 }

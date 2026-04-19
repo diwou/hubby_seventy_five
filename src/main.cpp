@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 #include <esp_system.h>
+#include <esp_task_wdt.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <LittleFS.h>
@@ -26,6 +27,24 @@ uint32_t lastWeatherFetch  = 0;
 uint32_t lastReconnectMs   = 0;
 bool     wifiConnected     = false;
 String   lastStatusMsg     = "";
+static constexpr uint32_t WATCHDOG_TIMEOUT_SEC = 30;
+static bool watchdogArmed = false;
+
+void appWatchdogFeed() {
+    if (watchdogArmed) {
+        esp_task_wdt_reset();
+    }
+}
+
+static void setupWatchdog() {
+    if (esp_task_wdt_init(WATCHDOG_TIMEOUT_SEC, true) == ESP_OK) {
+        esp_task_wdt_add(NULL);
+        watchdogArmed = true;
+        Serial.printf("[WDT] Aktiviert (%lu s)\n", (unsigned long)WATCHDOG_TIMEOUT_SEC);
+    } else {
+        Serial.println("[WDT] Init fehlgeschlagen.");
+    }
+}
 
 static const char* resetReasonName(esp_reset_reason_t reason) {
     switch (reason) {
@@ -59,6 +78,7 @@ static bool wifiConnect() {
     uint32_t start   = millis();
 
     while (WiFi.status() != WL_CONNECTED) {
+        appWatchdogFeed();
         if (millis() - start > timeout) {
             Serial.println("[WiFi] Timeout.");
             return false;
@@ -76,6 +96,7 @@ static bool wifiConnect() {
 static void startAP() {
     apModeActive = true;
 
+    appWatchdogFeed();
     WiFi.disconnect(true);
     delay(100);
 
@@ -93,6 +114,7 @@ static void startAP() {
     delay(200);
 
     dnsServer.start(53, "*", WiFi.softAPIP());
+    appWatchdogFeed();
 
     Serial.printf("[AP] SSID: %s  IP: %s\n", apSSID, WiFi.softAPIP().toString().c_str());
     displayShowAP(String(apSSID), WiFi.softAPIP().toString());
@@ -111,6 +133,7 @@ static void ntpSync() {
     struct tm t;
     uint32_t start = millis();
     while (!getLocalTime(&t, 200)) {
+        appWatchdogFeed();
         if (millis() - start > 10000) {
             Serial.println(" Timeout!");
             return;
@@ -128,6 +151,7 @@ static void ntpSync() {
 void setup() {
     Serial.begin(115200);
     delay(300);
+    setupWatchdog();
     displayPreparePins();
     Serial.printf("\n\n=== %s ===\n", FW_VERSION);
     Serial.printf("[Boot] Reset-Grund: %s (%d)\n",
@@ -212,6 +236,7 @@ void setup() {
 void loop() {
     // Neustart sicher aus dem Haupt-Loop (nicht aus AsyncWebServer-Callback)
     if (factoryResetPending || restartPending) {
+        appWatchdogFeed();
         delay(300);
         ESP.restart();
     }
@@ -224,6 +249,7 @@ void loop() {
     // DNS-Server im AP-Modus
     if (apModeActive) {
         dnsServer.processNextRequest();
+        appWatchdogFeed();
         delay(5);
         return;
     }
@@ -263,6 +289,7 @@ void loop() {
             displayShowMessage(lastStatusMsg, C_WARN);
             dma_display->flipDMABuffer();
         }
+        appWatchdogFeed();
         delay(200);
         return;
     }
@@ -286,10 +313,13 @@ void loop() {
     if (!cfg.owm_apikey.isEmpty() && wifiConnected &&
         (lastWeatherFetch == 0 || nowMs - lastWeatherFetch >= weatherInterval)) {
         lastWeatherFetch = nowMs;
+        appWatchdogFeed();
         fetchWeather();
+        appWatchdogFeed();
         Serial.printf("[Weather] %.1f° — %s\n",
                       weather.current_temp, weather.current_cond.c_str());
     }
 
+    appWatchdogFeed();
     delay(10);  // ~80 FPS: geringerer Loop-Jitter → bessere NTP-Sync-Präzision
 }

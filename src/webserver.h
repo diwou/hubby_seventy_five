@@ -763,12 +763,18 @@ void otaSetup() {
         otaRunning = true;
         displaySetOtaActive(true);
         displayShowOTA(0, 1);
+        appWatchdogFeed();
     });
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
         displayShowOTA((uint32_t)progress, (uint32_t)total);
+        appWatchdogFeed();
     });
-    ArduinoOTA.onEnd([]()   { otaRunning = false; });
+    ArduinoOTA.onEnd([]()   {
+        appWatchdogFeed();
+        otaRunning = false;
+    });
     ArduinoOTA.onError([](ota_error_t) {
+        appWatchdogFeed();
         otaRunning = false;
         displaySetOtaActive(false);
     });

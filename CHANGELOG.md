@@ -25,6 +25,8 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Wenn der Forecast uebergangsweise in die oberen Zeilen hineinragt, wird die Uhrzeit direkt danach noch einmal frisch gezeichnet, damit der obere Bereich auf 1x und 2x HUB75 sauber bleibt [`b71d805`]
 - Waehrend der Forecast-Transition wird der linke Uhrbereich nun aktiv geloescht und vollstaendig neu gezeichnet, inklusive statischer Ziffern und Sekundenleiste. Dadurch kann der Forecast wieder komplett nach oben ausblenden, ohne sichtbare Reste in der Uhrzeit zu hinterlassen [`87ecbb4`]
 - Forecast-Transition korrigiert die eigentliche Ursache: Die bewegte Vorhersage wird nun vor dem Schreiben auf das HUB75-Display auf das Wetterfenster ab `y=21` geclippt, statt die Uhrzeit nachtraeglich zu reparieren. Dadurch kann die alte Zeile komplett nach oben ausblenden, ohne auf dem linken Panel in die Uhrzeit zu schreiben; `pio run` erfolgreich [`186398b`]
+- Task-Watchdog ergänzt: Der Haupttask wird jetzt mit `esp_task_wdt` ueberwacht und in den absichtlichen Warte-/Reconnect-/HTTP-Pfaden regelmaessig gefuettert. Haengt die Firmware dennoch fest, loest der ESP32 jetzt einen automatischen Reset aus statt stumm stehenzubleiben.
+- OTA-Watchdog-Falle beseitigt: Waehrend eines Firmware-Uploads fuettern jetzt die `ArduinoOTA`-Callbacks den Watchdog mit, damit der Upload nicht selbst als Hänger endet.
 
 ## [1.6.1] - 2026-04-11
 
