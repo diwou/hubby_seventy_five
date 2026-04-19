@@ -896,6 +896,7 @@ static void _drawForecastTransition(Gfx& gfx, uint32_t now) {
             if (weatherMode == 0) {
                 _buildCurrentStr();
                 weatherScrollX256 = (int32_t)DISPLAY_W << 8;
+                weatherScrollMs = now;
             }
             break;
         }
@@ -1009,6 +1010,8 @@ static void _drawWeatherLine() {
                         weatherScrollMs = now;
                     } else {
                         _buildCurrentStr();
+                        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
+                        weatherScrollMs = now;
                     }
                 }
             }

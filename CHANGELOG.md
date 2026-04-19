@@ -13,6 +13,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ## [1.6.2] - 2026-04-19
 
 ### Fixed
+- Beim Ruecksprung vom Forecast auf das aktuelle Wetter werden Scroll-Start und Scroll-Zeit jetzt gemeinsam neu gesetzt, damit nicht nur der Rest der Zeile sichtbar bleibt [`bb6ac12`]
 - Der aktuelle Wetter-Scroll nutzt jetzt wieder eine feste Zeitbasis mit Festkomma-Position, ohne Forecast oder Übergänge anzufassen [`2b9e867`]
 - Beim Neustart des aktuellen Wetter-Scrolls wird der Scroll-Start jetzt mit zurückgesetzt, damit nicht nur der Zeilenschluss sichtbar wird [`2b9e867`]
 - Die Wetterzeile wurde wieder auf die alte Anzeige zurückgesetzt, nachdem die jüngsten Experimente Artefakte und Flickern erzeugt hatten [`b035168`]
