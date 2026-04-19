@@ -788,6 +788,17 @@ static void _blitWeatherCanvas(Gfx& gfx) {
     }
 }
 
+template<typename Gfx>
+static void _drawSoftScrollText(Gfx& gfx, int x, int y, const String& s, uint16_t color, uint8_t phase) {
+    uint8_t lead  = (uint8_t)(255 - phase);
+    uint8_t trail = phase;
+
+    _printStrEx(gfx, x,     y, s, _fadeColor(color, lead));
+    if (trail > 0) {
+        _printStrEx(gfx, x - 1, y, s, _fadeColor(color, trail));
+    }
+}
+
 static void _buildCurrentStr() {
     if (!weather.valid || cfg.owm_apikey.isEmpty()) {
         weatherScrollStr = cfg.owm_apikey.isEmpty() ? "Kein API-Key" : "Kein Wetter";
@@ -968,7 +979,8 @@ static void _drawWeatherLine() {
 
     if (weatherMode == 0) {
         // --- Modus 0: aktuelles Wetter scrollend ---
-        if (now - weatherScrollMs >= cfg.scroll_speed_ms) {
+        uint32_t scrollElapsed = now - weatherScrollMs;
+        if (scrollElapsed >= cfg.scroll_speed_ms) {
             weatherScrollMs = now;
             int textPx = _textWidthEx(weatherScrollStr);
             if (textPx > DISPLAY_W - 4) {
@@ -1006,8 +1018,11 @@ static void _drawWeatherLine() {
                 }
             }
         }
+        uint32_t scrollDenom = (cfg.scroll_speed_ms == 0) ? 1UL : (uint32_t)cfg.scroll_speed_ms;
+        uint32_t scrollPhaseRaw = (scrollElapsed * 255UL) / scrollDenom;
+        uint8_t scrollPhase = (scrollPhaseRaw > 255UL) ? 255 : (uint8_t)scrollPhaseRaw;
         weatherCanvas.setTextSize(1);
-        _printStrEx(weatherCanvas, weatherScrollX, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
+        _drawSoftScrollText(weatherCanvas, weatherScrollX, WEATHER_BAND_Y, weatherScrollStr, C_TEMP, scrollPhase);
         _blitWeatherCanvas(weatherCanvas);
         return;
     }

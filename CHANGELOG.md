@@ -28,6 +28,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Die Kurz-BOM in `kicad/README.md` wird jetzt direkt aus `kicad/fab/rev0.2/bom/bom.csv` generiert, zeigt jetzt auch die Bauformen mit an und kann mit `scripts/render_kicad_bom_summary.py --write-readme` reproduzierbar aktualisiert werden.
 - Die BOM-Übersicht nennt jetzt explizit, dass `U5` ein ESP32-S3-WROOM-1 mit PSRAM sein muss.
 - Die Wetterzeile wird jetzt erst komplett in einem Offscreen-Canvas gerendert und danach als fertiger Block auf das Display kopiert; das reduziert das sichtbare Flickern bei Scrolltext und Vorhersage merklich.
+- Der aktuelle Wetter-Scrolltext wird jetzt zwischen zwei Nachbarpositionen weich überblendet, damit die Bewegung weniger hart wirkt, ohne die Scrollgeschwindigkeit zu ändern.
 - Statusbilder, die die Matrix kurz loeschen, markieren nun die statischen Uhr- und Datumsbereiche wieder als dirty. Dadurch kommen Uhrzeit, Datum und Wochentag nach einer kurzen NTP-/WLAN-Stoerung sofort komplett zurueck und bleiben nicht bis zur naechsten echten Aenderung leer [`572f1c1`]
 - Vorhersage-Kacheln wechseln jetzt als Uebergang nach oben weg: Die aktuelle Kachel faehrt und blendet nach oben aus, waehrend die naechste von unten einfaehrt und dabei eingeblendet wird [`200baba`]
 - Der neue Vorhersage-Uebergang baut jetzt sauber ohne alte `forecastSlide*`-Reste und wurde mit `pio run` erfolgreich kompiliert.
