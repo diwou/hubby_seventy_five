@@ -21,6 +21,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Der erste Wetterabruf startet jetzt direkt nach erfolgreichem WLAN-/NTP-Setup, damit er schon waehrend des anschließenden IP-/Hostname-Scrolltexts geladen werden kann [`cf8f9d1`]
 - Der Scrolltimer des aktuellen Wettertexts wird beim Neuaufbau jetzt sauber auf den Start der neuen Zeile zurückgesetzt, damit der erste Lauf nicht mehr ruckelt [`cf8f9d1`]
 - Die Scrollzeile zeichnet wieder nur noch eine einzige Textlage statt einer optischen Doppelüberblendung, damit nichts mehr doppelt oder in wechselnder Helligkeit erscheint [`fba49fb`]
+- Beim Wechsel von der Vorhersage zurück zum aktuellen Wetter wird der Scrollstart jetzt sauber neu gesetzt, damit nach dem Forecast nicht nur noch ein Rest der Zeile am linken Rand stehenbleibt.
 - Beim Boot werden jetzt alle Laufzeit-Flags explizit zurückgesetzt, damit ein Software-Reset keine alten OTA-/AP-/Reconnect-Zustände aus der vorherigen Sitzung mitnimmt [`95aa9e6`]
 - Der WiFi-Stack wird beim Boot nicht mehr hart auf `WIFI_OFF` zurückgesetzt; nur die Laufzeit-Flags werden noch zurückgesetzt, damit OTA und WLAN-Setup nicht wieder unnötig gestört werden [`95aa9e6`]
 - OTA gibt die Display-Sperre nach einem erfolgreichen Abschluss jetzt wieder frei, damit ein verzögerter Neustart nicht auf einem dauerhaft blockierten Display endet [`95aa9e6`]
