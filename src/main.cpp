@@ -58,12 +58,6 @@ static void resetRuntimeState() {
     watchdogLastKickMs = millis();
 }
 
-static void resetWiFiStack() {
-    WiFi.disconnect(true, true);
-    WiFi.mode(WIFI_OFF);
-    delay(100);
-}
-
 static void watchdogRecordHang(const char* phase, uint32_t ageMs) {
     time_t now = time(nullptr);
     rtcLastWatchdogEpoch = (now > 1700000000L) ? (uint32_t)now : 0;
@@ -221,10 +215,9 @@ void setup() {
     Serial.begin(115200);
     delay(300);
     resetRuntimeState();
-    resetWiFiStack();
     setupWatchdog();
     displayPreparePins();
-    Serial.printf("\n\n=== %s ===\n", FW_VERSION);
+    Serial.printf("\n\n=== HUB75 Clock %s ===\n", FW_VERSION);
     Serial.printf("[Boot] Reset-Grund: %s (%d)\n",
                   resetReasonName(esp_reset_reason()), (int)esp_reset_reason());
 
@@ -248,7 +241,7 @@ void setup() {
     dma_display->print("HUB75 Clock");
     dma_display->setTextColor(C_INFO);
     dma_display->setCursor(0, 9);
-    dma_display->print("v" FW_VER);
+    dma_display->print("v" FW_VERSION);
     dma_display->setTextColor(C_DATE);
     dma_display->setCursor(0, 17);
     dma_display->print("Verbinde...");

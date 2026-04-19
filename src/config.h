@@ -6,8 +6,9 @@
 // ============================================================
 // Firmware-Version — NUR HIER ändern!
 // ============================================================
-#define FW_VER "1.6.2"
-static const char FW_VERSION[] = "HUB75 Clock " FW_VER;
+#ifndef FW_VERSION
+#define FW_VERSION "1.6.2"
+#endif
 
 #define CFG_FILE "/cfg.json"
 

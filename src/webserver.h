@@ -595,7 +595,7 @@ void webServerSetup() {
         JsonDocument doc;
         uint32_t nowMs = millis();
 
-        doc["firmware"] = FW_VERSION;
+        doc["firmware"] = String("HUB75 Clock ") + FW_VERSION;
         doc["display_layout"] = String(displayPanelColumns()) + "x" + String(displayPanelRows())
                               + " HUB75 (" + String(displayWidth()) + "x" + String(displayHeight())
                               + ", " + (displayPanelMapping() == 0 ? "linear" : "zigzag") + ")";

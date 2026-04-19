@@ -19,9 +19,12 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Das Webinterface zeigt beim letzten Watchdog-Hänger jetzt auch den gespeicherten Zeitpunkt an, sofern zum Auslösezeitpunkt bereits eine gültige Uhrzeit vorhanden war.
 - Der Wetterabruf wurde aus dem `setup()`-Pfad entfernt, damit ein blockierender API- oder Netzfehler den Start nicht mehr bei `Wetter...` festhält; der normale Loop übernimmt den Abruf.
 - Beim Boot werden jetzt alle Laufzeit-Flags explizit zurückgesetzt, damit ein Software-Reset keine alten OTA-/AP-/Reconnect-Zustände aus der vorherigen Sitzung mitnimmt.
-- Beim Boot wird der WiFi-Stack jetzt einmal hart auf `WIFI_OFF` zurückgesetzt, damit ein Software-Reset nicht mit einem halb offenen Funkzustand in den nächsten Lauf uebergeht.
+- Der WiFi-Stack wird beim Boot nicht mehr hart auf `WIFI_OFF` zurückgesetzt; nur die Laufzeit-Flags werden noch zurückgesetzt, damit OTA und WLAN-Setup nicht wieder unnötig gestört werden.
 - OTA gibt die Display-Sperre nach einem erfolgreichen Abschluss jetzt wieder frei, damit ein verzögerter Neustart nicht auf einem dauerhaft blockierten Display endet.
 - Das Status-Tab im Webinterface aktualisiert sich jetzt per Ajax im 1-Sekunden-Takt und zeigt zusätzlich die letzte interne Gerätemeldung an.
+- Die Firmware-Version zeigt im Development-Build jetzt zusätzlich die kurze Codeberg-Commit-ID an, während Release-Builds nur die Versionsnummer anzeigen.
+- Die Startanzeige auf dem Display verwendet jetzt denselben Release-/Development-String wie der Rest der Firmware-Version.
+- Die Versionsausgabe nutzt jetzt wieder nur noch eine einzige Variable (`FW_VERSION`) für Display, Webinterface, Serial-Log und Firmware-Export.
 - Die Kurz-BOM in `kicad/README.md` wird jetzt direkt aus `kicad/fab/rev0.2/bom/bom.csv` generiert, zeigt jetzt auch die Bauformen mit an und kann mit `scripts/render_kicad_bom_summary.py --write-readme` reproduzierbar aktualisiert werden.
 - Die BOM-Übersicht nennt jetzt explizit, dass `U5` ein ESP32-S3-WROOM-1 mit PSRAM sein muss.
 - Statusbilder, die die Matrix kurz loeschen, markieren nun die statischen Uhr- und Datumsbereiche wieder als dirty. Dadurch kommen Uhrzeit, Datum und Wochentag nach einer kurzen NTP-/WLAN-Stoerung sofort komplett zurueck und bleiben nicht bis zur naechsten echten Aenderung leer [`572f1c1`]

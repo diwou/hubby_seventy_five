@@ -12,9 +12,9 @@ CHIP_FAMILY = "ESP32-S3"
 def read_fw_version():
     config_path = Path(env["PROJECT_DIR"]) / "src" / "config.h"
     text = config_path.read_text(encoding="utf-8")
-    match = re.search(r'#define\s+FW_VER\s+"([^"]+)"', text)
+    match = re.search(r'#define\s+FW_VERSION\s+"([^"]+)"', text)
     if not match:
-        raise ValueError("FW_VER konnte in src/config.h nicht gefunden werden")
+        raise ValueError("FW_VERSION konnte in src/config.h nicht gefunden werden")
     return match.group(1)
 
 
@@ -48,7 +48,7 @@ def build_manifest(version: str):
 
 def export_firmware(source, target, env):
     project_dir = Path(env["PROJECT_DIR"])
-    version = read_fw_version()
+    version = env.get("FW_VERSION_LABEL") or read_fw_version()
     firmware_bin = Path(source[0].get_abspath())
     build_dir = firmware_bin.parent
 
