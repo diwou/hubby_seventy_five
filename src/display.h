@@ -662,6 +662,9 @@ static uint8_t   forecastTransitionFrom    = 1;
 static uint8_t   forecastTransitionTo      = 1;
 static uint8_t   forecastTransitionStep    = 0;
 static uint32_t  forecastTransitionMs      = 0;
+static constexpr int WEATHER_CLEAR_Y = 21;
+static constexpr int WEATHER_TEXT_Y  = 23;
+static constexpr int WEATHER_TEXT_H  = 8;
 // Datum-Dirty-Counter auf Modulebene, damit displayReset() ihn zurücksetzen kann
 static int       datLastMday  = -1;
 static uint8_t   datDirty     = 2;
@@ -750,6 +753,35 @@ static int _drawTempWithUnit(int x, int y, const char* temp, uint16_t tempColor,
     return x + tempPx + NARROW_SPACE_PX + 6;
 }
 
+static void _printTextClippedToWeather(int x, int y, const String& s, uint16_t color) {
+    static GFXcanvas1 canvas(PANEL_W * 2, WEATHER_TEXT_H);
+
+    canvas.fillScreen(0);
+    canvas.setTextWrap(false);
+    canvas.setTextSize(1);
+    canvas.setTextColor(1);
+    canvas.setCursor(x, 0);
+    canvas.print(s);
+
+    for (int py = 0; py < WEATHER_TEXT_H; py++) {
+        int sy = y + py;
+        if (sy < WEATHER_CLEAR_Y || sy >= DISPLAY_H) continue;
+        for (int px = 0; px < DISPLAY_W; px++) {
+            if (canvas.getPixel(px, py)) {
+                dma_display->drawPixel(px, sy, color);
+            }
+        }
+    }
+}
+
+static int _drawTempWithUnitClippedToWeather(int x, int y, const char* temp, uint16_t tempColor,
+                                             const char* unit, uint16_t unitColor) {
+    int tempPx = (int)strlen(temp) * 6;
+    _printTextClippedToWeather(x, y, String(temp), tempColor);
+    _printTextClippedToWeather(x + tempPx + NARROW_SPACE_PX, y, String(unit), unitColor);
+    return x + tempPx + NARROW_SPACE_PX + 6;
+}
+
 static void _buildCurrentStr() {
     if (!weather.valid || cfg.owm_apikey.isEmpty()) {
         weatherScrollStr = cfg.owm_apikey.isEmpty() ? "Kein API-Key" : "Kein Wetter";
@@ -789,7 +821,7 @@ static void _drawForecastStatic(int idx, int yOff = 0, uint8_t fade = 255) {
     int dayNamePx = dayName.length() * 6;
     int totalW  = dayNamePx + 6 + dayPx + unitPx + 18 + nightPx + unitPx;
     int x       = max(0, (DISPLAY_W - totalW) / 2);
-    const int y = 23 + yOff;
+    const int y = WEATHER_TEXT_Y + yOff;
     uint16_t warnCol = _fadeColor(C_WARN, fade);
     uint16_t tempCol = _fadeColor(C_TEMP, fade);
     uint16_t infoCol = _fadeColor(C_INFO, fade);
@@ -809,6 +841,36 @@ static void _drawForecastStatic(int idx, int yOff = 0, uint8_t fade = 255) {
     x += 18;
 
     x = _drawTempWithUnit(x, y, nightBuf, dateCol, unit, infoCol);
+}
+
+static void _drawForecastStaticClippedToWeather(int idx, int yOff, uint8_t fade) {
+    char dayBuf[6], nightBuf[6];
+    const char* unit = (cfg.owm_unit == 0) ? "C" : "F";
+    snprintf(dayBuf,   sizeof(dayBuf),   "%+d", (int)roundf(weather.forecast[idx].temp_day));
+    snprintf(nightBuf, sizeof(nightBuf), "%+d", (int)roundf(weather.forecast[idx].temp_night));
+    String dayName = forecastDayName(idx + 1);
+
+    int dayPx     = strlen(dayBuf) * 6;
+    int nightPx   = strlen(nightBuf) * 6;
+    int unitPx    = NARROW_SPACE_PX + 6;
+    int dayNamePx = dayName.length() * 6;
+    int totalW    = dayNamePx + 6 + dayPx + unitPx + 18 + nightPx + unitPx;
+    int x         = max(0, (DISPLAY_W - totalW) / 2);
+    const int y   = WEATHER_TEXT_Y + yOff;
+    uint16_t warnCol = _fadeColor(C_WARN, fade);
+    uint16_t tempCol = _fadeColor(C_TEMP, fade);
+    uint16_t infoCol = _fadeColor(C_INFO, fade);
+    uint16_t dateCol = _fadeColor(C_DATE, fade);
+
+    _printTextClippedToWeather(x, y, dayName, warnCol);
+    x += dayNamePx + 6;
+
+    x = _drawTempWithUnitClippedToWeather(x, y, dayBuf, tempCol, unit, infoCol);
+
+    _printTextClippedToWeather(x, y, String(" / "), infoCol);
+    x += 18;
+
+    x = _drawTempWithUnitClippedToWeather(x, y, nightBuf, dateCol, unit, infoCol);
 }
 
 static void _drawForecastTransition(uint32_t now) {
@@ -833,7 +895,7 @@ static void _drawForecastTransition(uint32_t now) {
     if (!forecastTransitionActive) {
         if (weatherMode == 0) {
             dma_display->setTextSize(1);
-            _printStrEx(weatherScrollX, 23, weatherScrollStr, C_TEMP);
+            _printStrEx(weatherScrollX, WEATHER_TEXT_Y, weatherScrollStr, C_TEMP);
         } else {
             _drawForecastStatic(weatherMode - 1, 0, 255);
         }
@@ -847,9 +909,9 @@ static void _drawForecastTransition(uint32_t now) {
         int outY = -phaseStep;
 
         if (forecastTransitionFrom == 0) {
-            _printStrEx(weatherScrollX, 23 + outY, weatherScrollStr, _fadeColor(C_TEMP, fadeOut));
+            _printStrEx(weatherScrollX, WEATHER_TEXT_Y, weatherScrollStr, _fadeColor(C_TEMP, fadeOut));
         } else {
-            _drawForecastStatic(forecastTransitionFrom - 1, outY, fadeOut);
+            _drawForecastStaticClippedToWeather(forecastTransitionFrom - 1, outY, fadeOut);
         }
         return;
     }
@@ -859,9 +921,9 @@ static void _drawForecastTransition(uint32_t now) {
     int inY = cfg.forecast_scroll_up ? (transitionSteps - phaseStep) : 0;
 
     if (forecastTransitionTo == 0) {
-        _printStrEx(weatherScrollX, 23 + inY, weatherScrollStr, _fadeColor(C_TEMP, fadeIn));
+        _printStrEx(weatherScrollX, WEATHER_TEXT_Y + inY, weatherScrollStr, _fadeColor(C_TEMP, fadeIn));
     } else {
-        _drawForecastStatic(forecastTransitionTo - 1, inY, fadeIn);
+        _drawForecastStaticClippedToWeather(forecastTransitionTo - 1, inY, fadeIn);
     }
 }
 
@@ -932,7 +994,7 @@ static void _drawWeatherLine() {
             }
         }
         dma_display->setTextSize(1);
-        _printStrEx(weatherScrollX, 23, weatherScrollStr, C_TEMP);
+        _printStrEx(weatherScrollX, WEATHER_TEXT_Y, weatherScrollStr, C_TEMP);
         return;
     }
 
@@ -1116,20 +1178,8 @@ void displayUpdate(struct tm* t) {
         }
 
     // Wetter-Zeile: immer neu (scrollt); ab y-2=21 damit Grossbuchstaben-Umlautpunkte (y-2) geloescht werden
-    dma_display->fillRect(0, 21, DISPLAY_W, 11, C_BLACK);
+    dma_display->fillRect(0, WEATHER_CLEAR_Y, DISPLAY_W, DISPLAY_H - WEATHER_CLEAR_Y, C_BLACK);
     _drawWeatherLine();
-    if (forecastTransitionActive) {
-        dma_display->fillRect(0, 0, 64, _maxClockAreaHeight(), C_BLACK);
-        for (int i = 0; i < 6; i++) {
-            digitDirty[i] = 1;
-        }
-        _drawFlipClock();
-        if (cfg.seconds_mode != 3) {
-            dma_display->fillRect(0, _secondsBarY(), 64, 2, C_BLACK);
-            _drawSeconds(t->tm_sec);
-        }
-        _drawDateArea(t);
-    }
 
     // AM/PM-Indikator nur im HH:MM-Modus
     if (cfg.time_12h && cfg.seconds_mode != 3) {
