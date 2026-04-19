@@ -28,6 +28,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Monitor-Watchdog ergänzt: Ein eigener FreeRTOS-Task ueberwacht jetzt den Heartbeat des Hauptpfads und startet das Geraet neu, wenn es wirklich haengt. OTA bleibt dabei aktiv, weil der Monitor nicht auf `esp_task_wdt` des Loop-Tasks angewiesen ist.
 - OTA-Watchdog-Falle beseitigt: Waehrend eines Firmware-Uploads fuettern jetzt die `ArduinoOTA`-Callbacks den Heartbeat mit, damit der Upload nicht selbst als Hänger endet.
 - KiCad-Projekt und Fertigungsdaten ins Repo einsortiert: `kicad/source/` enthält die Bearbeitungsquellen fuer Revision `0.2`, `kicad/fab/rev0.2/` die Gerber-, BOM- und Bestell-Artefakte; das komplette Fertigungspaket liegt dort direkt als ZIP, lokale Backups und Cache-Dateien bleiben per `.gitignore` ausgeschlossen.
+- In `kicad/README.md` steht jetzt eine kleine lesbare Kurz-BOM aus der exportierten CSV, damit man ohne KiCad sofort die wichtigsten Bestückungsgruppen sieht.
 
 ## [1.6.1] - 2026-04-11
 
