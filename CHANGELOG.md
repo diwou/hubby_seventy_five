@@ -23,7 +23,7 @@ Ab `1.6.0` sollen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Forecast-Animation weiter entkoppelt: Erst blendet die alte Zeile komplett aus, erst danach faehrt die neue von unten ein. Damit ueberlagern sich Aus- und Einblenden nicht mehr [`2be3e2a`]
 - Nach dem Praxistest wurde der vertikale Abstieg des alten Forecasts wieder auf den unteren Wetterstreifen begrenzt, damit er auf dem Einzelpanel nicht mehr in die Uhrzeit hineinragt [`5f48c5d`]
 - Wenn der Forecast uebergangsweise in die oberen Zeilen hineinragt, wird die Uhrzeit direkt danach noch einmal frisch gezeichnet, damit der obere Bereich auf 1x und 2x HUB75 sauber bleibt [`b71d805`]
-- Waehrend der Forecast-Transition wird der linke Uhrbereich nun aktiv geloescht und vollstaendig neu gezeichnet, inklusive statischer Ziffern und Sekundenleiste. Dadurch kann der Forecast wieder komplett nach oben ausblenden, ohne sichtbare Reste in der Uhrzeit zu hinterlassen.
+- Waehrend der Forecast-Transition wird der linke Uhrbereich nun aktiv geloescht und vollstaendig neu gezeichnet, inklusive statischer Ziffern und Sekundenleiste. Dadurch kann der Forecast wieder komplett nach oben ausblenden, ohne sichtbare Reste in der Uhrzeit zu hinterlassen [`87ecbb4`]
 
 ## [1.6.1] - 2026-04-11
 
