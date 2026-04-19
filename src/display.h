@@ -657,7 +657,7 @@ static void _drawDateRight(struct tm* t) {
 // ============================================================
 static uint8_t   weatherMode      = 0;
 static uint32_t  weatherLastMs    = 0;
-static int       weatherScrollX   = DISPLAY_W;
+static int32_t   weatherScrollX256 = (int32_t)DISPLAY_W << 8;
 static uint32_t  weatherScrollMs  = 0;
 static String    weatherScrollStr = "";
 static bool      forecastTransitionActive = false;
@@ -799,6 +799,17 @@ static void _drawSoftScrollText(Gfx& gfx, int x, int y, const String& s, uint16_
     }
 }
 
+template<typename Gfx>
+static void _drawInterpolatedScrollText(Gfx& gfx, int32_t x256, int y, const String& s, uint16_t color) {
+    int xBase = (int)(x256 >> 8);
+    uint8_t frac = (uint8_t)(x256 & 0xFF);
+
+    _printStrEx(gfx, xBase, y, s, _fadeColor(color, (uint8_t)(255 - frac)));
+    if (frac > 0) {
+        _printStrEx(gfx, xBase - 1, y, s, _fadeColor(color, frac));
+    }
+}
+
 static void _buildCurrentStr() {
     if (!weather.valid || cfg.owm_apikey.isEmpty()) {
         weatherScrollStr = cfg.owm_apikey.isEmpty() ? "Kein API-Key" : "Kein Wetter";
@@ -906,7 +917,7 @@ static void _drawForecastTransition(Gfx& gfx, uint32_t now) {
             weatherLastMs = now;
             if (weatherMode == 0) {
                 _buildCurrentStr();
-                weatherScrollX = DISPLAY_W;
+                weatherScrollX256 = (int32_t)DISPLAY_W << 8;
             }
             break;
         }
@@ -915,7 +926,7 @@ static void _drawForecastTransition(Gfx& gfx, uint32_t now) {
     if (!forecastTransitionActive) {
         if (weatherMode == 0) {
             gfx.setTextSize(1);
-            _printStrEx(gfx, weatherScrollX, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
+            _drawInterpolatedScrollText(gfx, weatherScrollX256, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
         } else {
             _drawForecastStatic(gfx, weatherMode - 1, 0, 255);
         }
@@ -929,7 +940,7 @@ static void _drawForecastTransition(Gfx& gfx, uint32_t now) {
         int outY = -phaseStep;
 
         if (forecastTransitionFrom == 0) {
-            _printStrEx(gfx, weatherScrollX, WEATHER_BAND_Y, weatherScrollStr, _fadeColor(C_TEMP, fadeOut));
+            _drawInterpolatedScrollText(gfx, weatherScrollX256, WEATHER_BAND_Y, weatherScrollStr, _fadeColor(C_TEMP, fadeOut));
         } else {
             _drawForecastStaticClippedToWeather(gfx, forecastTransitionFrom - 1, outY, fadeOut);
         }
@@ -941,7 +952,7 @@ static void _drawForecastTransition(Gfx& gfx, uint32_t now) {
     int inY = cfg.forecast_scroll_up ? (transitionSteps - phaseStep) : 0;
 
     if (forecastTransitionTo == 0) {
-        _printStrEx(gfx, weatherScrollX, WEATHER_BAND_Y + inY, weatherScrollStr, _fadeColor(C_TEMP, fadeIn));
+        _drawInterpolatedScrollText(gfx, weatherScrollX256, WEATHER_BAND_Y + inY, weatherScrollStr, _fadeColor(C_TEMP, fadeIn));
     } else {
         _drawForecastStaticClippedToWeather(gfx, forecastTransitionTo - 1, inY, fadeIn);
     }
@@ -984,9 +995,9 @@ static void _drawWeatherLine() {
             weatherScrollMs = now;
             int textPx = _textWidthEx(weatherScrollStr);
             if (textPx > DISPLAY_W - 4) {
-                weatherScrollX--;
-                if (weatherScrollX < -textPx) {
-                    weatherScrollX = -textPx;  // einfrieren
+                weatherScrollX256 -= 256;
+                if ((weatherScrollX256 >> 8) < -textPx) {
+                    weatherScrollX256 = (int32_t)(-textPx) << 8;  // einfrieren
                     if (now - weatherLastMs >= cyclems) {
                         weatherLastMs = now;
                         if (maxMode > 1) {
@@ -998,11 +1009,11 @@ static void _drawWeatherLine() {
                         } else {
                             _buildCurrentStr();  // kein Forecast: neu aufbauen
                         }
-                        weatherScrollX = DISPLAY_W;
+                        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
                     }
                 }
             } else {
-                weatherScrollX = (DISPLAY_W - textPx) / 2;
+                weatherScrollX256 = (int32_t)((DISPLAY_W - textPx) / 2) << 8;
                 if (now - weatherLastMs >= cyclems) {
                     weatherLastMs = now;
                     if (maxMode > 1) {
@@ -1011,18 +1022,15 @@ static void _drawWeatherLine() {
                         forecastTransitionTo = 1;
                         forecastTransitionStep = 0;
                         forecastTransitionMs = now;
-                        weatherScrollX = DISPLAY_W;
+                        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
                     } else {
                         _buildCurrentStr();
                     }
                 }
             }
         }
-        uint32_t scrollDenom = (cfg.scroll_speed_ms == 0) ? 1UL : (uint32_t)cfg.scroll_speed_ms;
-        uint32_t scrollPhaseRaw = (scrollElapsed * 255UL) / scrollDenom;
-        uint8_t scrollPhase = (scrollPhaseRaw > 255UL) ? 255 : (uint8_t)scrollPhaseRaw;
         weatherCanvas.setTextSize(1);
-        _drawSoftScrollText(weatherCanvas, weatherScrollX, WEATHER_BAND_Y, weatherScrollStr, C_TEMP, scrollPhase);
+        _drawInterpolatedScrollText(weatherCanvas, weatherScrollX256, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
         _blitWeatherCanvas(weatherCanvas);
         return;
     }
@@ -1137,7 +1145,7 @@ void displayReset() {
     }
     colonFrame = -1; colonFrameMs = 0; colonLastSec = -1;
     weatherMode = 0; weatherLastMs = 0;
-    weatherScrollX = DISPLAY_W; weatherScrollMs = 0;
+    weatherScrollX256 = (int32_t)DISPLAY_W << 8; weatherScrollMs = 0;
     weatherScrollStr = "";
     forecastTransitionActive = false;
     forecastTransitionFrom = 1;
