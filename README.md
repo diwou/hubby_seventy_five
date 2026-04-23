@@ -65,7 +65,7 @@ Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollstän
 
 ### KiCad / Platine
 
-Die Platine liegt unter [`kicad/`](kicad/). Die bearbeitbaren KiCad-Quellen liegen in [`kicad/source/`](kicad/source/), die auslieferbaren Fertigungsdaten für Revision `0.2` in [`kicad/fab/rev0.2/`](kicad/fab/rev0.2/). Dort findest Du Gerber, Bohrdaten, BOM, Positionsdateien und das komplette Fertigungspaket als ZIP.
+Die Platine liegt unter [`kicad/`](kicad/). Die bearbeitbaren KiCad-Quellen liegen in [`kicad/source/`](kicad/source/), die auslieferbaren Fertigungsdaten für Revision `0.3` in [`kicad/fab/rev0.3/`](kicad/fab/rev0.3/). Dort findest Du Gerber, Bohrdaten, BOM, Positionsdateien und das komplette Fertigungspaket als ZIP.
 
 ---
 

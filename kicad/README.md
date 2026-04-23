@@ -4,14 +4,14 @@ Dieses Verzeichnis enthält die Platinenquellen und die exportierten Fertigungsd
 
 ## Struktur
 
-- `source/` - bearbeitbare KiCad-Quellen für Revision `0.2`
-- `fab/rev0.2/gerber/` - Gerber-, Bohr- und Layer-Exporte
-- `fab/rev0.2/bom/` - BOM, Designatoren, Positionen und Netlist
-- `fab/rev0.2/Hubby_Seventy_Five_0.2.zip` - komplettes Fertigungspaket für den Bestelldienstleister
+- `source/` - bearbeitbare KiCad-Quellen für Revision `0.3`
+- `fab/rev0.3/gerber/` - Gerber-, Bohr- und Layer-Exporte
+- `fab/rev0.3/bom/` - BOM, Designatoren, Positionen und Netlist
+- `fab/rev0.3/Hubby_Seventy_Five_0.3.zip` - komplettes Fertigungspaket für den Bestelldienstleister
 
 ## Kurz-BOM
 
-_Abgeleitet aus `fab/rev0.2/bom/bom.csv` und per `scripts/render_kicad_bom_summary.py` generiert. Falls sich die Platine ändert, die Übersicht mit `python3 scripts/render_kicad_bom_summary.py --write-readme` neu schreiben._
+_Abgeleitet aus `fab/rev0.3/bom/bom.csv` und per `scripts/render_kicad_bom_summary.py` generiert. Falls sich die Platine ändert, die Übersicht mit `python3 scripts/render_kicad_bom_summary.py --write-readme` neu schreiben._
 
 <!-- BOM_SUMMARY_START -->
 
@@ -31,7 +31,7 @@ _Abgeleitet aus `fab/rev0.2/bom/bom.csv` und per `scripts/render_kicad_bom_summa
 
 Hinweise:
 - `H1` bis `H4` sind Montagebohrungen und tauchen deshalb nicht in der BOM-CSV auf.
-- Die vollständige, exportierte Stückliste liegt zusätzlich als CSV unter `fab/rev0.2/bom/`.
+- Die vollständige, exportierte Stückliste liegt zusätzlich als CSV unter `fab/rev0.3/bom/`.
 - `U5` muss ein ESP32-S3-WROOM-1 mit PSRAM sein; das Projekt nutzt die PSRAM-Variante des Moduls.
 
 ## Hinweise

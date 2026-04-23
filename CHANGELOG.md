@@ -8,7 +8,10 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ---
 
-## [Next]
+## [UNRELEASED]
+
+### Changed
+- KiCad-Projekt und Fertigungsdaten wurden auf Revision `0.3` angehoben: `kicad/source/` spiegelt jetzt den aktuellen Schaltplan- und PCB-Stand, und `kicad/fab/rev0.3/` enthält das passende Gerber-/BOM-/ZIP-Paket fuer den Platinendienstleister.
 
 ## [1.6.2] - 2026-04-19
 
@@ -29,7 +32,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Die Firmware-Version zeigt im Development-Build jetzt zusätzlich die kurze Codeberg-Commit-ID an, während Release-Builds nur die Versionsnummer anzeigen.
 - Die Startanzeige auf dem Display verwendet jetzt denselben Release-/Development-String wie der Rest der Firmware-Version.
 - Die Versionsausgabe nutzt jetzt wieder nur noch eine einzige Variable (`FW_VERSION`) für Display, Webinterface, Serial-Log und Firmware-Export.
-- Die Kurz-BOM in `kicad/README.md` wird jetzt direkt aus `kicad/fab/rev0.2/bom/bom.csv` generiert, zeigt jetzt auch die Bauformen mit an und kann mit `scripts/render_kicad_bom_summary.py --write-readme` reproduzierbar aktualisiert werden.
+- Die Kurz-BOM in `kicad/README.md` wird jetzt direkt aus `kicad/fab/rev0.3/bom/bom.csv` generiert, zeigt jetzt auch die Bauformen mit an und kann mit `scripts/render_kicad_bom_summary.py --write-readme` reproduzierbar aktualisiert werden.
 - Die BOM-Übersicht nennt jetzt explizit, dass `U5` ein ESP32-S3-WROOM-1 mit PSRAM sein muss.
 - Die Wetterzeile wird jetzt erst komplett in einem Offscreen-Canvas gerendert und danach als fertiger Block auf das Display kopiert; das reduziert das sichtbare Flickern bei Scrolltext und Vorhersage merklich.
 - Statusbilder, die die Matrix kurz loeschen, markieren nun die statischen Uhr- und Datumsbereiche wieder als dirty. Dadurch kommen Uhrzeit, Datum und Wochentag nach einer kurzen NTP-/WLAN-Stoerung sofort komplett zurueck und bleiben nicht bis zur naechsten echten Aenderung leer [`572f1c1`]
