@@ -9,7 +9,7 @@ I---
 ## [UNRELEASED]
 
 ### Changed
-- Die `HH:MM:SS`-Ziffern nutzen jetzt eine kanten-erhaltende Form: breite Läufe werden nicht mehr verbreitert, sondern als schmale 2-Pixel-Streifen an den Rändern gezeichnet, damit z. B. die `4` ihr Loch behält.
+- Die `HH:MM:SS`-Ziffern nutzen jetzt eine kanten-erhaltende Form: breite Läufe werden nicht mehr verbreitert, sondern als schmale 2-Pixel-Streifen an den Rändern gezeichnet, damit z. B. die `4` ihr Loch behält [`fbcdde8`]
 - KiCad-Projekt und Fertigungsdaten wurden auf Revision `0.3` angehoben: `kicad/source/` spiegelt jetzt den aktuellen Schaltplan- und PCB-Stand, und `kicad/fab/rev0.3/` enthält das passende Gerber-/BOM-/ZIP-Paket fuer den Platinendienstleister.
 - Dauerhafte Projektleitplanken wurden jetzt direkt in `AGENTS.md` und `docs/Releasing.md` verankert, damit KiCad-Revision, Backups und Release-Artefakte nicht mehr jedes Mal neu erklärt werden muessen.
 
