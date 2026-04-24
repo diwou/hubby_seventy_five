@@ -177,9 +177,9 @@ void colorsInit() {
 //  HH:MM (seconds_mode 0-2), DIGIT_W=10, 2px Abstand zwischen Zifferpaaren:
 //  H1=7  H2=19  :(4px)=31  M1=35  M2=47
 //
-//  HH:MM:SS (seconds_mode 3), 7px Ziffern, 2×2px Doppelpunkte:
-//  H1=2..8  gap=9  H2=11..17  colon=19..20  M1=23..29  gap=30
-//  M2=32..38  colon=40..41  S1=44..50  gap=51  S2=53..59
+//  HH:MM:SS (seconds_mode 3), 9px Ziffern, 2×2px Doppelpunkte:
+//  H1=0..8  gap=9  H2=10..18  colon=19..20  M1=21..29  gap=30
+//  M2=31..39  colon=40..41  S1=42..50  gap=51  S2=52..60
 // ============================================================
 #define DIGIT_W  10
 #define DIGIT_H  14
@@ -224,7 +224,7 @@ static const uint16_t _digits[11][14] PROGMEM = {
 
 // ============================================================
 // Ziffer zeichnen: Bitmap-Pixel ab (x, yOff) in Farbe color
-// cols: Slot-Breite zum Loeschen (DIGIT_W=10 oder 8 fuer HH:MM:SS)
+// cols: Anzahl gezeichneter Spalten (DIGIT_W=10 oder 9 für HH:MM:SS)
 // Zeile 13 wird nie gezeichnet (Clip dy >= DIGIT_H-1) → 1px Gap
 // ============================================================
 static inline bool _useLegacySinglePanelHHMMSS() {
@@ -280,7 +280,6 @@ static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
         if (dy < 0 || dy >= clipH) continue;
         uint16_t bits = pgm_read_word(&_digits[idx][rowMap[row]]);
         uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);  // mittlere 8 Spalten
-        compactBits |= (compactBits >> 1);                   // um 1px nach rechts verbreitern
         for (int col = 0; col < 8; col++) {
             if (compactBits & (1u << (7 - col)))
                 dma_display->drawPixel(x + col, dy, color);
@@ -365,11 +364,11 @@ static void _drawClockDigit(int x, const FlipDigit& d, int cols) {
 // Uhrzeit zeichnen: HH:MM oder HH:MM:SS je nach seconds_mode
 // Nur animierende oder dirty Ziffern werden neu gezeichnet.
 //
-// HH:MM:SS Layout: 7px Ziffern + 2×2px Kolons.
-// 6×7 + 2×2 + 7×1px Gaps = 53px effektiver Inhalt, mit Reserve rechts im 64px-Feld.
-// Die erste freie Spalte bleibt bewusst erhalten, damit die Uhr nicht am Rand klebt.
-//  x=2..8   gap=9   x=11..17  gap=18  C1=19..20  gap=21
-//  x=23..29  gap=30  x=32..38  gap=39  C2=40..41  gap=42  x=44..50  gap=51  x=53..59
+// HH:MM:SS Layout: 8px Ziffern (Dottie-Inhalt in Spalten 1-7) + 2×2px Kolons.
+// 6×8 + 2×2 + 7×1px Gaps = 59px, zentriert ab x=2 (2px links, 3px rechts frei).
+// Alle 7 Abstände je 1px garantiert!
+//  x=2..9   gap=10  x=11..18  gap=19  C1=20..21  gap=22
+//  x=23..30  gap=31  x=32..39  gap=40  C2=41..42  gap=43  x=44..51  gap=52  x=53..60
 // ============================================================
 static void _drawFlipClock() {
     uint32_t now          = millis();
