@@ -376,12 +376,11 @@ async function loadStatus(){
 
 async function searchCity(){
   const city=document.getElementById('owm_city').value.trim();
-  const key=document.getElementById('owm_apikey').value.trim();
-  if(!city||!key){showMsg('Bitte Stadt und API-Key eingeben',false);return;}
+  if(!city){showMsg('Bitte Stadt eingeben',false);return;}
   const btn=event.target;
   btn.disabled=true;btn.textContent='...';
   try{
-    const r=await fetch('/api/geocode?q='+encodeURIComponent(city)+'&apikey='+encodeURIComponent(key));
+    const r=await fetch('/api/geocode?q='+encodeURIComponent(city));
     const d=await r.json();
     const box=document.getElementById('geoResults');
     box.innerHTML='';
@@ -677,19 +676,22 @@ void webServerSetup() {
         req->send(200, "application/json", out);
     });
 
-    // GET /api/geocode?q={city}&apikey={key}
+    // GET /api/geocode?q={city}
     // Ruft OWM Geocoding API auf und liefert bis zu 5 Treffer zurück
     webServer.on("/api/geocode", HTTP_GET, [](AsyncWebServerRequest* req) {
-        if (!req->hasParam("q") || !req->hasParam("apikey")) {
-            req->send(400, "application/json", "{\"error\":\"Parameter q und apikey erforderlich\"}");
+        if (!req->hasParam("q")) {
+            req->send(400, "application/json", "{\"error\":\"Parameter q erforderlich\"}");
             return;
         }
         String city   = req->getParam("q")->value();
-        String apikey = req->getParam("apikey")->value();
+        if (cfg.owm_apikey.isEmpty()) {
+            req->send(400, "application/json", "{\"error\":\"Kein API-Key konfiguriert\"}");
+            return;
+        }
         city.replace(" ", "+");
 
-        String url = "http://api.openweathermap.org/geo/1.0/direct?q="
-                   + city + "&limit=5&appid=" + apikey;
+        String url = "https://api.openweathermap.org/geo/1.0/direct?q="
+                   + city + "&limit=5&appid=" + cfg.owm_apikey;
         HttpResult res = _httpGet(url);
         if (res.code == 200) {
             req->send(200, "application/json", res.body);

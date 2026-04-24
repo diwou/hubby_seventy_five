@@ -210,7 +210,7 @@ bool fetchWeather() {
         // dieselbe OWM-Station wie bei direkter lat/lon-Abfrage getroffen wird.
         String city = cfg.owm_city;
         city.replace(" ", "+");
-        String geoUrl = "http://api.openweathermap.org/geo/1.0/direct?q="
+        String geoUrl = "https://api.openweathermap.org/geo/1.0/direct?q="
                       + city + "&limit=1&appid=" + cfg.owm_apikey;
         HttpResult geoRes = _httpGet(geoUrl);
         bool geoOk = false;
@@ -231,7 +231,7 @@ bool fetchWeather() {
     }
 
     // --- Aktuelles Wetter ---
-    String url = "http://api.openweathermap.org/data/2.5/weather?" + locParam
+    String url = "https://api.openweathermap.org/data/2.5/weather?" + locParam
                + "&units=" + units + "&lang=" + lang
                + "&appid=" + cfg.owm_apikey;
     HttpResult currentRes = _httpGet(url);
@@ -256,7 +256,7 @@ bool fetchWeather() {
     }
 
     // --- 5-Tage / 3-Stunden Forecast ---
-    url = "http://api.openweathermap.org/data/2.5/forecast?" + locParam
+    url = "https://api.openweathermap.org/data/2.5/forecast?" + locParam
         + "&cnt=40&units=" + units + "&lang=" + lang
         + "&appid=" + cfg.owm_apikey;
     HttpResult forecastRes = _httpGet(url);

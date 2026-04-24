@@ -332,6 +332,7 @@ static FlipDigit flip[6];
 static int8_t   colonFrame  = -1;  // -1=statisch hell, 0..13=Cross-Dissolve-Puls
 static uint32_t colonFrameMs = 0;
 static int      colonLastSec = -1;
+static uint8_t  lastSecondsMode = 255;
 
 // Dirty-Counter: 2 = beide DMA-Buffer müssen noch aktualisiert werden
 // Startet bei 2, damit beim Boot beide Buffer korrekt initialisiert werden
@@ -1138,6 +1139,7 @@ void displayReset() {
         digitDirty[i] = 2;
     }
     colonFrame = -1; colonFrameMs = 0; colonLastSec = -1;
+    lastSecondsMode = 255;
     weatherMode = 0; weatherLastMs = 0;
     weatherScrollX256 = (int32_t)DISPLAY_W << 8; weatherScrollMs = 0;
     weatherScrollStr = "";
@@ -1164,7 +1166,6 @@ void displayUpdate(struct tm* t) {
     // Bei Wechsel des seconds_mode: gesamten Ziffernbereich in BEIDEN DMA-Buffern leeren.
     // clearModeBuf=2 sorgt dafür, dass fillRect in den nächsten 2 Frames ausgeführt wird
     // (je einer pro Buffer), damit keine Geisterpixel des alten Layouts übrigbleiben.
-    static uint8_t lastSecondsMode = 255;
     static uint8_t clearModeBuf   = 0;
     if (cfg.seconds_mode != lastSecondsMode) {
         lastSecondsMode = cfg.seconds_mode;
