@@ -194,9 +194,6 @@ static constexpr int  NARROW_SPACE_PX       = 3;
 // Zeilenformat: 14 × uint16_t pro Ziffer
 // Chamfered corners: Zeile 0 + 13 → 8px (Spalte 1-8), Rest voll
 // ============================================================
-// Dottie 8×8-Font, konvertiert: (uint16_t)dottie_byte << 1
-// Inhalt in Spalten 1-8 (bit8..bit1), 1 Leerzeile oben, 5 unten
-// (Inhalt 2px nach oben verschoben gegenüber Ursprungsversion)
 static const uint16_t _digits[11][14] PROGMEM = {
 //  0: {0x3C,0x66,0x66,0x66,0x66,0x66,0x66,0x3C}
     { 0x000, 0x078,0x0CC,0x0CC,0x0CC,0x0CC,0x0CC,0x0CC,0x078, 0x000,0x000,0x000,0x000,0x000 },
@@ -222,6 +219,34 @@ static const uint16_t _digits[11][14] PROGMEM = {
     { 0x000, 0x000,0x000,0x000,0x000,0x000,0x000,0x000,0x000, 0x000,0x000,0x000,0x000,0x000 },
 };
 
+// Dedizierter 7x14-Font fuer HH:MM:SS.
+// Die Ziffern bleiben schmal genug fuer das 64px-Layout, ohne dass einzelne
+// Striche durch nachtraegliche Bit-Operationen ausduennen oder Luecken verlieren.
+static const uint8_t _digitsHHMMSS[11][DIGIT_VISIBLE_H_HHMMSS] PROGMEM = {
+// 0
+    { 0x1C, 0x3E, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x3E, 0x1C },
+// 1
+    { 0x0C, 0x1C, 0x3C, 0x6C, 0x4C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x7F, 0x7F },
+// 2
+    { 0x1C, 0x3E, 0x63, 0x63, 0x03, 0x06, 0x0E, 0x1C, 0x38, 0x30, 0x70, 0x60, 0x7F, 0x7F },
+// 3
+    { 0x1C, 0x3E, 0x63, 0x63, 0x03, 0x03, 0x1E, 0x1E, 0x03, 0x03, 0x63, 0x63, 0x3E, 0x1C },
+// 4
+    { 0x06, 0x0E, 0x1E, 0x1E, 0x36, 0x36, 0x66, 0x66, 0x7F, 0x7F, 0x06, 0x06, 0x06, 0x06 },
+// 5
+    { 0x7F, 0x7F, 0x60, 0x60, 0x60, 0x7E, 0x7F, 0x03, 0x03, 0x03, 0x63, 0x63, 0x3E, 0x1C },
+// 6
+    { 0x1C, 0x3E, 0x63, 0x63, 0x60, 0x60, 0x7E, 0x7F, 0x63, 0x63, 0x63, 0x63, 0x3E, 0x1E },
+// 7
+    { 0x7F, 0x7F, 0x03, 0x03, 0x06, 0x06, 0x0C, 0x0C, 0x18, 0x18, 0x30, 0x30, 0x30, 0x30 },
+// 8
+    { 0x1C, 0x3E, 0x63, 0x63, 0x63, 0x63, 0x3E, 0x3E, 0x63, 0x63, 0x63, 0x63, 0x3E, 0x1C },
+// 9
+    { 0x1C, 0x3E, 0x63, 0x63, 0x63, 0x63, 0x3F, 0x1F, 0x03, 0x03, 0x63, 0x63, 0x3E, 0x1C },
+// leer
+    { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+};
+
 // ============================================================
 // Ziffer zeichnen: Bitmap-Pixel ab (x, yOff) in Farbe color
 // cols: Anzahl gezeichneter Spalten (DIGIT_W=10 oder 9 für HH:MM:SS)
@@ -234,7 +259,6 @@ static inline bool _useLegacySinglePanelHHMMSS() {
 static inline bool _useTallHHMM() { return cfg.seconds_mode != 3; }
 
 static inline int _digitVisibleHeight() {
-    if (_useLegacySinglePanelHHMMSS()) return 9;
     return _useTallHHMM() ? DIGIT_VISIBLE_H_HHMM : DIGIT_VISIBLE_H_HHMMSS;
 }
 
@@ -257,31 +281,13 @@ static inline int _clockYOffset() {
 
 static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
     if (idx < 0 || idx > 10) return;
-    if (_useLegacySinglePanelHHMMSS()) {
-        for (int row = 0; row < DIGIT_H; row++) {
-            int dy = row + yOff;
-            if (dy < 0 || dy >= 9) continue;
-            uint16_t bits = pgm_read_word(&_digits[idx][row]);
-            uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);
-            for (int col = 0; col < 8; col++) {
-                if (compactBits & (1u << (7 - col)))
-                    dma_display->drawPixel(x + col, dy, color);
-            }
-        }
-        return;
-    }
-
     int clipH = DIGIT_VISIBLE_H_HHMMSS + _clockYOffset();
-    static const uint8_t rowMap[DIGIT_VISIBLE_H_HHMMSS] = {
-        1, 1, 2, 2, 3, 4, 4, 5, 6, 6, 7, 7, 8, 8
-    };
     for (int row = 0; row < DIGIT_VISIBLE_H_HHMMSS; row++) {
         int dy = row + yOff;
         if (dy < 0 || dy >= clipH) continue;
-        uint16_t bits = pgm_read_word(&_digits[idx][rowMap[row]]);
-        uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);  // mittlere 8 Spalten
-        for (int col = 0; col < 8; col++) {
-            if (compactBits & (1u << (7 - col)))
+        uint8_t bits = pgm_read_byte(&_digitsHHMMSS[idx][row]);
+        for (int col = 0; col < 7; col++) {
+            if (bits & (1u << (6 - col)))
                 dma_display->drawPixel(x + col, dy, color);
         }
     }
@@ -376,7 +382,7 @@ static void _drawFlipClock() {
     int      visibleH     = _digitVisibleHeight();
     int      maxFrame     = (cfg.anim_mode == 0) ? (visibleH * 2 - 1) : 14;
     int      nDigits      = (cfg.seconds_mode == 3) ? 6 : 4;
-    int      cols         = (cfg.seconds_mode == 3) ? DIGIT_W - 2 : DIGIT_W;
+    int      cols         = (cfg.seconds_mode == 3) ? 7 : DIGIT_W;
 
     static const int posHHMM[4]   = { 7, 19, 35, 47 };
     static const int posHHMMSS[6] = { 2, 11, 23, 32, 44, 53 };
