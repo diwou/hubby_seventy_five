@@ -4,15 +4,14 @@ Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumenti
 
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
-Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten stehen, damit auch bei mehreren Commits am selben Tag jede Aenderung eindeutig nachvollziehbar bleibt. Sammel-IDs nur fuer Release-/Milestone-Metadaten, nicht als Ersatz fuer Einzelreferenzen.
-
----
+I---
 
 ## [UNRELEASED]
 
 ### Changed
 - KiCad-Projekt und Fertigungsdaten wurden auf Revision `0.3` angehoben: `kicad/source/` spiegelt jetzt den aktuellen Schaltplan- und PCB-Stand, und `kicad/fab/rev0.3/` enthält das passende Gerber-/BOM-/ZIP-Paket fuer den Platinendienstleister.
 - Dauerhafte Projektleitplanken wurden jetzt direkt in `AGENTS.md` und `docs/Releasing.md` verankert, damit KiCad-Revision, Backups und Release-Artefakte nicht mehr jedes Mal neu erklärt werden muessen.
+- Die `HH:MM:SS`-Uhrzeit wurde in der Zeichenbreite um 1 Pixel verbreitert; die sechs Ziffern bleiben im vorhandenen Layout, wirken aber weniger gedrängt und erhalten weiter etwas Rand am Displayanfang.
 
 ## [1.6.2] - 2026-04-19
 
