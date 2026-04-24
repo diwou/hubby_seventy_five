@@ -255,70 +255,43 @@ static inline int _clockYOffset() {
     return (cfg.seconds_mode == 3) ? 3 : 0;
 }
 
-static inline uint8_t _shapeHHMMSSBits(uint8_t bits) {
-    if (!bits) return 0;
-
-    uint8_t shaped = 0;
-    int col = 0;
-    while (col < 8) {
-        if (!(bits & (1u << (7 - col)))) {
-            col++;
-            continue;
-        }
-
-        int start = col;
-        while (col < 8 && (bits & (1u << (7 - col)))) col++;
-        int len = col - start;
-
-        if (len <= 2) {
-            for (int i = start; i < col; i++) {
-                shaped |= (1u << (7 - i));
-            }
-        } else if (len == 3) {
-            for (int i = start + 1; i <= start + 2 && i < 8; i++) {
-                shaped |= (1u << (7 - i));
-            }
-        } else {
-            for (int i = start; i < start + 2; i++) {
-                shaped |= (1u << (7 - i));
-            }
-            for (int i = col - 2; i < col; i++) {
-                shaped |= (1u << (7 - i));
-            }
-        }
-    }
-    return shaped;
-}
+// Dedizierter 7px-Font fuer HH:MM:SS.
+// Die Ziffern bleiben schmal genug fuer das 64px-Layout, ohne dass einzelne
+// Striche durch nachtraegliche Bit-Operationen ausduennen oder Luecken verlieren.
+static const uint8_t _digitsHHMMSS[11][8] PROGMEM = {
+// 0
+    { 0x3E, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x3E },
+// 1
+    { 0x18, 0x38, 0x18, 0x18, 0x18, 0x18, 0x18, 0x3C },
+// 2
+    { 0x3E, 0x63, 0x03, 0x06, 0x0C, 0x18, 0x30, 0x7E },
+// 3
+    { 0x3E, 0x63, 0x03, 0x1E, 0x03, 0x03, 0x63, 0x3E },
+// 4
+    { 0x66, 0x66, 0x66, 0x66, 0x7E, 0x06, 0x06, 0x06 },
+// 5
+    { 0x7E, 0x60, 0x60, 0x7C, 0x03, 0x03, 0x63, 0x3E },
+// 6
+    { 0x1E, 0x30, 0x60, 0x7C, 0x63, 0x63, 0x63, 0x3E },
+// 7
+    { 0x7E, 0x03, 0x06, 0x0C, 0x18, 0x18, 0x18, 0x18 },
+// 8
+    { 0x3E, 0x63, 0x63, 0x3E, 0x63, 0x63, 0x63, 0x3E },
+// 9
+    { 0x3E, 0x63, 0x63, 0x63, 0x3F, 0x03, 0x06, 0x1C },
+// leer
+    { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+};
 
 static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
     if (idx < 0 || idx > 10) return;
-    if (_useLegacySinglePanelHHMMSS()) {
-        for (int row = 0; row < DIGIT_H; row++) {
-            int dy = row + yOff;
-            if (dy < 0 || dy >= 9) continue;
-            uint16_t bits = pgm_read_word(&_digits[idx][row]);
-            uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);
-            compactBits = _shapeHHMMSSBits(compactBits);
-            for (int col = 0; col < 8; col++) {
-                if (compactBits & (1u << (7 - col)))
-                    dma_display->drawPixel(x + col, dy, color);
-            }
-        }
-        return;
-    }
-
-    int clipH = DIGIT_VISIBLE_H_HHMMSS + _clockYOffset();
-    static const uint8_t rowMap[DIGIT_VISIBLE_H_HHMMSS] = {
-        1, 1, 2, 2, 3, 4, 4, 5, 6, 6, 7, 7, 8, 8
-    };
-    for (int row = 0; row < DIGIT_VISIBLE_H_HHMMSS; row++) {
+    int clipH = _useLegacySinglePanelHHMMSS() ? 9 : (DIGIT_VISIBLE_H_HHMMSS + _clockYOffset());
+    for (int row = 0; row < 8; row++) {
         int dy = row + yOff;
         if (dy < 0 || dy >= clipH) continue;
-        uint16_t bits = pgm_read_word(&_digits[idx][rowMap[row]]);
-        uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);  // mittlere 8 Spalten
-        compactBits = _shapeHHMMSSBits(compactBits);
-        for (int col = 0; col < 8; col++) {
-            if (compactBits & (1u << (7 - col)))
+        uint8_t bits = pgm_read_byte(&_digitsHHMMSS[idx][row]);
+        for (int col = 0; col < 7; col++) {
+            if (bits & (1u << (6 - col)))
                 dma_display->drawPixel(x + col, dy, color);
         }
     }
