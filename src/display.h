@@ -285,11 +285,15 @@ static const uint8_t _digitsHHMMSS[11][8] PROGMEM = {
 
 static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
     if (idx < 0 || idx > 10) return;
-    int clipH = _useLegacySinglePanelHHMMSS() ? 9 : (DIGIT_VISIBLE_H_HHMMSS + _clockYOffset());
-    for (int row = 0; row < 8; row++) {
+    int clipH = DIGIT_VISIBLE_H_HHMMSS + _clockYOffset();
+    static const uint8_t rowMap[DIGIT_VISIBLE_H_HHMMSS] = {
+        0, 0, 1, 1, 2, 2, 3, 3,
+        4, 4, 5, 5, 6, 7
+    };
+    for (int row = 0; row < DIGIT_VISIBLE_H_HHMMSS; row++) {
         int dy = row + yOff;
         if (dy < 0 || dy >= clipH) continue;
-        uint8_t bits = pgm_read_byte(&_digitsHHMMSS[idx][row]);
+        uint8_t bits = pgm_read_byte(&_digitsHHMMSS[idx][rowMap[row]]);
         for (int col = 0; col < 7; col++) {
             if (bits & (1u << (6 - col)))
                 dma_display->drawPixel(x + col, dy, color);
