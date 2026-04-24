@@ -255,21 +255,39 @@ static inline int _clockYOffset() {
     return (cfg.seconds_mode == 3) ? 3 : 0;
 }
 
-static inline uint8_t _widenHHMMSSBits(uint8_t bits) {
+static inline uint8_t _shapeHHMMSSBits(uint8_t bits) {
     if (!bits) return 0;
 
-    int left = 0;
-    while (left < 8 && !(bits & (1u << (7 - left)))) left++;
+    uint8_t shaped = 0;
+    int col = 0;
+    while (col < 8) {
+        if (!(bits & (1u << (7 - col)))) {
+            col++;
+            continue;
+        }
 
-    int right = 7;
-    while (right >= 0 && !(bits & (1u << (7 - right)))) right--;
+        int start = col;
+        while (col < 8 && (bits & (1u << (7 - col)))) col++;
+        int len = col - start;
 
-    if (right < 7) {
-        bits |= (1u << (7 - (right + 1)));
-    } else if (left > 0) {
-        bits |= (1u << (7 - (left - 1)));
+        if (len <= 2) {
+            for (int i = start; i < col; i++) {
+                shaped |= (1u << (7 - i));
+            }
+        } else if (len == 3) {
+            for (int i = start + 1; i <= start + 2 && i < 8; i++) {
+                shaped |= (1u << (7 - i));
+            }
+        } else {
+            for (int i = start; i < start + 2; i++) {
+                shaped |= (1u << (7 - i));
+            }
+            for (int i = col - 2; i < col; i++) {
+                shaped |= (1u << (7 - i));
+            }
+        }
     }
-    return bits;
+    return shaped;
 }
 
 static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
@@ -280,7 +298,7 @@ static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
             if (dy < 0 || dy >= 9) continue;
             uint16_t bits = pgm_read_word(&_digits[idx][row]);
             uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);
-            compactBits = _widenHHMMSSBits(compactBits);
+            compactBits = _shapeHHMMSSBits(compactBits);
             for (int col = 0; col < 8; col++) {
                 if (compactBits & (1u << (7 - col)))
                     dma_display->drawPixel(x + col, dy, color);
@@ -298,7 +316,7 @@ static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
         if (dy < 0 || dy >= clipH) continue;
         uint16_t bits = pgm_read_word(&_digits[idx][rowMap[row]]);
         uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);  // mittlere 8 Spalten
-        compactBits = _widenHHMMSSBits(compactBits);
+        compactBits = _shapeHHMMSSBits(compactBits);
         for (int col = 0; col < 8; col++) {
             if (compactBits & (1u << (7 - col)))
                 dma_display->drawPixel(x + col, dy, color);
