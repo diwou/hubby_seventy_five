@@ -11,6 +11,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ## [UNRELEASED]
 
 ### Changed
+- Die `6` im `HH:MM:SS`-Font wurde noch einmal nachkorrigiert, damit der letzte Rahmen oben und unten wieder sauber schließt. [b25ff24]
 - OWM laeuft jetzt ausschliesslich per HTTPS, die Geocoding-Suche sendet den API-Key nicht mehr aus dem Browser, und `displayReset()` setzt den Sekunden-Mode-Zustand sauber mit zurueck. [2a2b83f]
 - Die `HH:MM:SS`-Ziffern verwenden jetzt exakt die neue 7×14-Glyphen-Tabelle mit 2px-starken Strichen und bleiben damit wieder sauber lesbar. [961f516]
 - Die Abstaende nach den Doppelpunkten im `HH:MM:SS`-Layout wurden so verschoben, dass danach jeweils 2 freie Pixel bleiben. [930fa2f]
