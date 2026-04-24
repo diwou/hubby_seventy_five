@@ -12,6 +12,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ### Changed
 - Die `HH:MM:SS`-Ziffern verwenden jetzt exakt die neue 7×14-Glyphen-Tabelle mit 2px-starken Strichen und bleiben damit wieder sauber lesbar. [961f516]
+- Die Abstaende nach den Doppelpunkten im `HH:MM:SS`-Layout wurden so verschoben, dass danach jeweils 2 freie Pixel bleiben. [930fa2f]
 - KiCad-Projekt und Fertigungsdaten wurden auf Revision `0.3` angehoben: `kicad/source/` spiegelt jetzt den aktuellen Schaltplan- und PCB-Stand, und `kicad/fab/rev0.3/` enthält das passende Gerber-/BOM-/ZIP-Paket fuer den Platinendienstleister.
 - Dauerhafte Projektleitplanken wurden jetzt direkt in `AGENTS.md` und `docs/Releasing.md` verankert, damit KiCad-Revision, Backups und Release-Artefakte nicht mehr jedes Mal neu erklärt werden muessen.
 
