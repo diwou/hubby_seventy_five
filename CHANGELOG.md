@@ -9,7 +9,7 @@ I---
 ## [UNRELEASED]
 
 ### Changed
-- Die `HH:MM:SS`-Ziffern werden jetzt am Außenrand verbreitert, damit Innenräume wie bei der `4` erhalten bleiben.
+- Die `HH:MM:SS`-Ziffern werden jetzt am Außenrand verbreitert, damit Innenräume wie bei der `4` erhalten bleiben [`af83120`]
 - KiCad-Projekt und Fertigungsdaten wurden auf Revision `0.3` angehoben: `kicad/source/` spiegelt jetzt den aktuellen Schaltplan- und PCB-Stand, und `kicad/fab/rev0.3/` enthält das passende Gerber-/BOM-/ZIP-Paket fuer den Platinendienstleister.
 - Dauerhafte Projektleitplanken wurden jetzt direkt in `AGENTS.md` und `docs/Releasing.md` verankert, damit KiCad-Revision, Backups und Release-Artefakte nicht mehr jedes Mal neu erklärt werden muessen.
 
