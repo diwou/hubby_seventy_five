@@ -255,6 +255,23 @@ static inline int _clockYOffset() {
     return (cfg.seconds_mode == 3) ? 3 : 0;
 }
 
+static inline uint8_t _widenHHMMSSBits(uint8_t bits) {
+    if (!bits) return 0;
+
+    int left = 0;
+    while (left < 8 && !(bits & (1u << (7 - left)))) left++;
+
+    int right = 7;
+    while (right >= 0 && !(bits & (1u << (7 - right)))) right--;
+
+    if (right < 7) {
+        bits |= (1u << (7 - (right + 1)));
+    } else if (left > 0) {
+        bits |= (1u << (7 - (left - 1)));
+    }
+    return bits;
+}
+
 static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
     if (idx < 0 || idx > 10) return;
     if (_useLegacySinglePanelHHMMSS()) {
@@ -263,7 +280,7 @@ static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
             if (dy < 0 || dy >= 9) continue;
             uint16_t bits = pgm_read_word(&_digits[idx][row]);
             uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);
-            compactBits |= (compactBits >> 1);  // auch im Legacy-Pfad 7px Sichtbreite
+            compactBits = _widenHHMMSSBits(compactBits);
             for (int col = 0; col < 8; col++) {
                 if (compactBits & (1u << (7 - col)))
                     dma_display->drawPixel(x + col, dy, color);
@@ -281,7 +298,7 @@ static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
         if (dy < 0 || dy >= clipH) continue;
         uint16_t bits = pgm_read_word(&_digits[idx][rowMap[row]]);
         uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);  // mittlere 8 Spalten
-        compactBits |= (compactBits >> 1);                   // um 1px nach rechts verbreitern
+        compactBits = _widenHHMMSSBits(compactBits);
         for (int col = 0; col < 8; col++) {
             if (compactBits & (1u << (7 - col)))
                 dma_display->drawPixel(x + col, dy, color);
