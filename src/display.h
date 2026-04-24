@@ -263,6 +263,7 @@ static void _drawDigitAtCompact(int x, int idx, int yOff, uint16_t color) {
             if (dy < 0 || dy >= 9) continue;
             uint16_t bits = pgm_read_word(&_digits[idx][row]);
             uint8_t compactBits = (uint8_t)((bits >> 1) & 0xFF);
+            compactBits |= (compactBits >> 1);  // auch im Legacy-Pfad 7px Sichtbreite
             for (int col = 0; col < 8; col++) {
                 if (compactBits & (1u << (7 - col)))
                     dma_display->drawPixel(x + col, dy, color);
