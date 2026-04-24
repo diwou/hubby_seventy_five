@@ -9,7 +9,7 @@ I---
 ## [UNRELEASED]
 
 ### Changed
-- Die `HH:MM:SS`-Ziffern nutzen jetzt einen echten 7×14-Font mit durchgehend 2px starken Strichen, damit keine Ziffer mehr ausgedünnte 1px-Linien zeigt [`e38272a`]
+- Die `HH:MM:SS`-Uhrzeit wurde in der Zeichenbreite um 1 Pixel verbreitert; die sechs Ziffern bleiben im vorhandenen Layout, wirken aber weniger gedrängt und erhalten weiter etwas Rand am Displayanfang [`ebc0095`]
 - KiCad-Projekt und Fertigungsdaten wurden auf Revision `0.3` angehoben: `kicad/source/` spiegelt jetzt den aktuellen Schaltplan- und PCB-Stand, und `kicad/fab/rev0.3/` enthält das passende Gerber-/BOM-/ZIP-Paket fuer den Platinendienstleister.
 - Dauerhafte Projektleitplanken wurden jetzt direkt in `AGENTS.md` und `docs/Releasing.md` verankert, damit KiCad-Revision, Backups und Release-Artefakte nicht mehr jedes Mal neu erklärt werden muessen.
 
