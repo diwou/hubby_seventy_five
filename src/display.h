@@ -177,9 +177,10 @@ void colorsInit() {
 //  HH:MM (seconds_mode 0-2), DIGIT_W=10, 2px Abstand zwischen Zifferpaaren:
 //  H1=7  H2=19  :(4px)=31  M1=35  M2=47
 //
-//  HH:MM:SS (seconds_mode 3), 9px Ziffern, 2×2px Doppelpunkte:
-//  H1=0..8  gap=9  H2=10..18  colon=19..20  M1=21..29  gap=30
-//  M2=31..39  colon=40..41  S1=42..50  gap=51  S2=52..60
+//  HH:MM:SS (seconds_mode 3), 7px Ziffern, 2×2px Doppelpunkte:
+//  H1=2..8   gap=9..10   H2=11..17  gap=18..19  colon=20..21
+//  M1=24..30  gap=31..32  M2=33..39  gap=40..41  colon=42..43
+//  S1=46..52  gap=53..54  S2=55..61
 // ============================================================
 #define DIGIT_W  10
 #define DIGIT_H  14
@@ -370,11 +371,11 @@ static void _drawClockDigit(int x, const FlipDigit& d, int cols) {
 // Uhrzeit zeichnen: HH:MM oder HH:MM:SS je nach seconds_mode
 // Nur animierende oder dirty Ziffern werden neu gezeichnet.
 //
-// HH:MM:SS Layout: 8px Ziffern (Dottie-Inhalt in Spalten 1-7) + 2×2px Kolons.
-// 6×8 + 2×2 + 7×1px Gaps = 59px, zentriert ab x=2 (2px links, 3px rechts frei).
-// Alle 7 Abstände je 1px garantiert!
-//  x=2..9   gap=10  x=11..18  gap=19  C1=20..21  gap=22
-//  x=23..30  gap=31  x=32..39  gap=40  C2=41..42  gap=43  x=44..51  gap=52  x=53..60
+// HH:MM:SS Layout: 6×7px Ziffern + 2×2px Kolons + 7×2px Abstände.
+// Gesamtbreite 60px, zentriert ab x=2 (2px links/rechts frei).
+//  x=2..8   gap=9..10   x=11..17  gap=18..19  C1=20..21  gap=22..23
+//  x=24..30  gap=31..32  x=33..39  gap=40..41  C2=42..43  gap=44..45
+//  x=46..52  gap=53..54  x=55..61
 // ============================================================
 static void _drawFlipClock() {
     uint32_t now          = millis();
@@ -385,7 +386,7 @@ static void _drawFlipClock() {
     int      cols         = (cfg.seconds_mode == 3) ? 7 : DIGIT_W;
 
     static const int posHHMM[4]   = { 7, 19, 35, 47 };
-    static const int posHHMMSS[6] = { 2, 11, 23, 32, 44, 53 };
+    static const int posHHMMSS[6] = { 2, 11, 24, 33, 46, 55 };
     const int* pos = (cfg.seconds_mode == 3) ? posHHMMSS : posHHMM;
 
     // Frames vorwärts schalten; beim Abschluss dirty setzen
@@ -424,18 +425,18 @@ static void _drawFlipClock() {
         cc = C_DIGIT_FADE[13 - colonFrame];
     if (cfg.seconds_mode == 3) {
         // HH:MM:SS: 2×2px Kolon-Punkte
-        // C1=20..21 (gap=19 vor, gap=22 nach Kolon)
-        // C2=41..42 (gap=40 vor, gap=43 nach Kolon)
+        // C1=20..21 (gap=18..19 vor, gap=22..23 nach Kolon)
+        // C2=42..43 (gap=40..41 vor, gap=44..45 nach Kolon)
         if (_useLegacySinglePanelHHMMSS()) {
-            dma_display->fillRect(21, 2, 2, 2, cc);
-            dma_display->fillRect(21, 7, 2, 2, cc);
+            dma_display->fillRect(20, 2, 2, 2, cc);
+            dma_display->fillRect(20, 7, 2, 2, cc);
             dma_display->fillRect(42, 2, 2, 2, cc);
             dma_display->fillRect(42, 7, 2, 2, cc);
         } else {
             dma_display->fillRect(20, 3 + _clockYOffset(), 2, 2, cc);
             dma_display->fillRect(20, 9 + _clockYOffset(), 2, 2, cc);
-            dma_display->fillRect(41, 3 + _clockYOffset(), 2, 2, cc);
-            dma_display->fillRect(41, 9 + _clockYOffset(), 2, 2, cc);
+            dma_display->fillRect(42, 3 + _clockYOffset(), 2, 2, cc);
+            dma_display->fillRect(42, 9 + _clockYOffset(), 2, 2, cc);
         }
     } else {
         // HH:MM: 2×2px Kolon-Punkte (je 3px Abstand zu den Zifferblöcken)
