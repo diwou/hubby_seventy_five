@@ -5,7 +5,7 @@ Zeigt Uhrzeit (NTP-synchronisiert), Datum und aktuelle Wetterdaten an. Vollstän
 
 **Aktuelle Version:** 1.6.2
 
-**Repository:** https://codeberg.org/diwou/Hubby_seventy_five
+**Repository:** https://codeberg.org/diwou/hubby_seventy_five
 
 **Lizenz:** CC BY-NC-SA 4.0, siehe [LICENSE](LICENSE)
 
@@ -146,8 +146,8 @@ Fuer einen einfachen USB-Erstflash ohne IDE gibt es ausserdem die Dateien `index
 ### Repository klonen
 
 ```bash
-git clone ssh://git@codeberg.org/diwou/Hubby_seventy_five.git
-cd Hubby_seventy_five
+git clone ssh://git@codeberg.org/diwou/hubby_seventy_five.git
+cd hubby_seventy_five
 ```
 
 ### Verwendete Bibliotheken
@@ -260,8 +260,12 @@ Hinweise:
 
 Das Webinterface ist in sechs Tabs gegliedert:
 
+Geschuetzte API-Aktionen verwenden HTTP Basic Auth. Standardzugang nach einem
+Factory Reset: Benutzer `admin`, Passwort `hub75clock`. Das Web-Passwort sollte
+im Tab **WLAN** geaendert werden.
+
 ### Status
-Zeigt Systeminformationen in Echtzeit (Auto-Refresh alle 30 Sekunden):
+Zeigt Systeminformationen in Echtzeit (Auto-Refresh jede Sekunde):
 - Firmware-Version, IP-Adresse, WLAN-SSID und Signalstärke (RSSI)
 - Uptime, aktuelle Uhrzeit
 - NTP-Synchronisationsstatus und aktiver NTP-Server
@@ -273,7 +277,8 @@ Schaltflächen: **Aktualisieren**, **Neustart**, **Factory Reset**
 
 ### WLAN
 - SSID und Passwort für das Heimnetz
-- AP-Passwort (leer = offener Hotspot ohne Passwort)
+- AP-Passwort (leer = offener Hotspot ohne Passwort, sonst mindestens 8 Zeichen)
+- Web-Passwort fuer HTTP Basic Auth (Benutzer `admin`, mindestens 8 Zeichen)
 - WLAN-Verbindungs-Timeout (Standard: 30 s)
 
 ### NTP
@@ -319,6 +324,7 @@ Alle Einstellungen werden in `/cfg.json` auf dem LittleFS-Dateisystem gespeicher
 | `sta_ssid` | `""` | SSID des Heimnetzwerks |
 | `sta_pass` | `""` | WLAN-Passwort |
 | `ap_password` | `""` | Passwort für den Konfigurationshotspot (leer = offen) |
+| `web_password` | `hub75clock` | Passwort fuer das Webinterface, Benutzer `admin` |
 | `wifi_timeout_sec` | `30` | Verbindungs-Timeout in Sekunden |
 
 ### NTP
@@ -491,14 +497,14 @@ H1=2  H2=11  [C1]=20..21  M1=23  M2=32  [C2]=41..42  S1=44  S2=53
 
 ## REST-API
 
-Das Webinterface kommuniziert über eine interne JSON-API. Alle Endpunkte sind unter der IP-Adresse des Geräts erreichbar.
+Das Webinterface kommuniziert über eine interne JSON-API. Alle Endpunkte sind unter der IP-Adresse des Geräts erreichbar und per HTTP Basic Auth geschützt (`admin` + Web-Passwort).
 
 | Methode | Endpunkt | Beschreibung |
 |---|---|---|
-| `GET` | `/api/config` | Alle Konfigurationswerte als JSON abrufen |
+| `GET` | `/api/config` | Konfigurationswerte als JSON abrufen; gespeicherte Passwoerter/API-Keys werden nicht ausgeliefert |
 | `POST` | `/api/config` | Konfiguration aktualisieren (JSON-Body) |
 | `GET` | `/api/status` | Systemstatus (Firmware, IP, WLAN, NTP, Wetter) |
-| `GET` | `/api/geocode?q={Stadt}&apikey={Key}` | Ortsuche via OWM Geocoding API (bis zu 5 Treffer) |
+| `GET` | `/api/geocode?q={Stadt}` | Ortsuche via OWM Geocoding API (bis zu 5 Treffer) |
 | `GET` | `/api/restart` | Gerät neu starten |
 | `GET` | `/api/reset` | Factory Reset (alle Einstellungen löschen + Neustart) |
 
@@ -507,16 +513,18 @@ Das Webinterface kommuniziert über eine interne JSON-API. Alle Endpunkte sind u
 ```bash
 # Helligkeit auf 150 setzen
 curl -X POST http://hub75clock.local/api/config \
+  -u admin:<web-passwort> \
   -H "Content-Type: application/json" \
   -d '{"brightness": 150}'
 
 # Auf ein einzelnes HUB75-Panel umstellen; Neustart danach erforderlich
 curl -X POST http://hub75clock.local/api/config \
+  -u admin:<web-passwort> \
   -H "Content-Type: application/json" \
   -d '{"display_panel_cols": 1, "display_panel_rows": 1}'
 
 # Aktuellen Status abrufen
-curl http://hub75clock.local/api/status
+curl -u admin:<web-passwort> http://hub75clock.local/api/status
 ```
 
 ---
@@ -530,6 +538,9 @@ src/
 ├── display.h      — HUB75-Initialisierung, Bitmap-Font, Flip-Animationen, Display-Update
 ├── weather.h      — OpenWeatherMap HTTP-Fetch, Wetter-Datenstruktur, Geocoding
 └── webserver.h    — AsyncWebServer, REST-API, Captive-Portal, OTA-Setup, HTML/CSS/JS
+include/
+├── config.h       — `APP_VERSION_BASE` als sichtbare Basisversion
+└── version_generated.h — beim Build erzeugter Firmware-String mit Git-Hash
 ```
 
 ### Wichtige Abhängigkeiten

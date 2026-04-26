@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "spell": "cspell --config cspell.json README.md CHANGELOG.md \"src/**/*.{h,cpp}\""
+    "spell": "cspell --config cspell.json README.md CHANGELOG.md docs/RELEASING.md \"src/**/*.{h,cpp}\""
   },
   "devDependencies": {
     "@cspell/dict-de-de": "4.1.2",

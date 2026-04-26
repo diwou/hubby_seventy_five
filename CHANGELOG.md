@@ -10,13 +10,21 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ## [UNRELEASED]
 
+### Fixed
+- Das Webinterface schuetzt Konfigurations-, Neustart-, Reset- und Firmware-Update-Endpunkte jetzt per HTTP Basic Auth, liefert gespeicherte Geheimnisse nicht mehr an `/api/config` aus und uebernimmt Passwortfelder nur noch, wenn wirklich ein neuer Wert gesendet wurde. [603e3f2]
+- Der Web-Firmware-Upload fuettert nun ebenfalls den App-Watchdog, damit lange Uploads nicht mehr durch den eigenen Monitor-Neustart abgebrochen werden. [603e3f2]
+- Der Wetterabruf blockiert den Bootpfad nicht mehr; nach erfolgreicher WLAN-/NTP-Initialisierung uebernimmt wieder der normale Loop den ersten Abruf. [603e3f2]
+- Aenderungen an sichtbaren Display-Einstellungen invalidieren jetzt Uhr-, Datums- und Wetterbereiche sofort, damit Farben, Sprache und Datumsformat ohne alte statische Pixel sichtbar werden. [603e3f2]
+- Ungueltig kurze AP-Passwoerter werden serverseitig abgelehnt und der AP-Start prueft den Rueckgabewert von `WiFi.softAP()`, statt Fehler still zu uebergehen. [603e3f2]
+
 ### Changed
 - Die `6` im `HH:MM:SS`-Font wurde noch einmal nachkorrigiert, damit der letzte Rahmen oben und unten wieder sauber schließt. [b25ff24]
 - OWM laeuft jetzt ausschliesslich per HTTPS, die Geocoding-Suche sendet den API-Key nicht mehr aus dem Browser, und `displayReset()` setzt den Sekunden-Mode-Zustand sauber mit zurueck. [2a2b83f]
 - Die `HH:MM:SS`-Ziffern verwenden jetzt exakt die neue 7×14-Glyphen-Tabelle mit 2px-starken Strichen und bleiben damit wieder sauber lesbar. [961f516]
 - Die Abstaende nach den Doppelpunkten im `HH:MM:SS`-Layout wurden so verschoben, dass danach jeweils 2 freie Pixel bleiben. [930fa2f]
-- KiCad-Projekt und Fertigungsdaten wurden auf Revision `0.3` angehoben: `kicad/source/` spiegelt jetzt den aktuellen Schaltplan- und PCB-Stand, und `kicad/fab/rev0.3/` enthält das passende Gerber-/BOM-/ZIP-Paket fuer den Platinendienstleister.
-- Dauerhafte Projektleitplanken wurden jetzt direkt in `AGENTS.md` und `docs/Releasing.md` verankert, damit KiCad-Revision, Backups und Release-Artefakte nicht mehr jedes Mal neu erklärt werden muessen.
+- Die sichtbare Versionsquelle liegt nun in `include/config.h` als `APP_VERSION_BASE`; `include/version_generated.h` wird beim Build aus Base-Version und Git-Hash erzeugt und von der Firmware genutzt. [603e3f2]
+- KiCad-Projekt und Fertigungsdaten wurden auf Revision `0.3` angehoben: `kicad/source/` spiegelt jetzt den aktuellen Schaltplan- und PCB-Stand, und `kicad/fab/rev0.3/` enthält das passende Gerber-/BOM-/ZIP-Paket fuer den Platinendienstleister. [6bd7dc8]
+- Dauerhafte Projektleitplanken wurden jetzt direkt in `AGENTS.md` und `docs/RELEASING.md` verankert, damit KiCad-Revision, Backups und Release-Artefakte nicht mehr jedes Mal neu erklärt werden muessen. [12f18d2]
 
 ## [1.6.2] - 2026-04-19
 
