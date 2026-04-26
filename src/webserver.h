@@ -37,6 +37,8 @@ extern uint32_t rtcLastWatchdogEpoch;
 // Forward-Deklarationen (definiert in display.h)
 void displayShowOTA(uint32_t progress, uint32_t total);
 void displaySetOtaActive(bool active);
+void displayInvalidateStatic();
+void displayResetWeatherLine();
 void colorsInit();
 void displaySetBrightness(uint8_t brightness);
 const char* resetReasonName(esp_reset_reason_t reason);
@@ -56,6 +58,32 @@ static uint16_t _clampU16(uint32_t value, uint16_t minVal, uint16_t maxVal) {
     if (value < minVal) return minVal;
     if (value > maxVal) return maxVal;
     return (uint16_t)value;
+}
+
+static bool _webAuthOk(AsyncWebServerRequest* req) {
+    return cfg.web_password.isEmpty()
+        || req->authenticate("admin", cfg.web_password.c_str(), "HUB75 Clock", false);
+}
+
+static bool _requireWebAuth(AsyncWebServerRequest* req) {
+    if (_webAuthOk(req)) return true;
+    req->requestAuthentication("HUB75 Clock", false);
+    return false;
+}
+
+static bool _jsonHasString(JsonDocument& doc, const char* key) {
+    return doc[key].is<const char*>();
+}
+
+static String _jsonString(JsonDocument& doc, const char* key) {
+    return doc[key].as<String>();
+}
+
+static void _sendJsonError(AsyncWebServerRequest* req, int code, const char* msg) {
+    String out = "{\"ok\":false,\"error\":\"";
+    out += msg;
+    out += "\"}";
+    req->send(code, "application/json", out);
 }
 
 // ============================================================
@@ -118,7 +146,8 @@ input[type=checkbox]{width:auto;margin-right:6px}
 <div id="p-wifi" class="panel">
   <label>SSID <input id="sta_ssid" maxlength="32"></label>
   <label>Passwort <input id="sta_pass" type="password" maxlength="64"></label>
-  <label>AP-Passwort (leer = offener AP) <input id="ap_password" type="password" maxlength="32"></label>
+  <label>AP-Passwort (leer = offener AP, sonst mindestens 8 Zeichen) <input id="ap_password" type="password" minlength="8" maxlength="32" placeholder="unverändert"></label>
+  <label>Web-Passwort (Benutzer: admin, mindestens 8 Zeichen) <input id="web_password" type="password" minlength="8" maxlength="32" placeholder="unverändert"></label>
   <label>WLAN Timeout (s) <input id="wifi_timeout_sec" type="number" min="10" max="120"></label>
   <button class="btn btn-save" onclick="save()">Speichern & Neustart</button>
 </div>
@@ -261,7 +290,7 @@ input[type=checkbox]{width:auto;margin-right:6px}
 <div id="msg"></div>
 
 <script>
-const fields=['sta_ssid','sta_pass','ap_password','wifi_timeout_sec','ntp1','ntp2','ntp3',
+const fields=['sta_ssid','sta_pass','ap_password','web_password','wifi_timeout_sec','ntp1','ntp2','ntp3',
   'ntp_interval_min','tz','owm_apikey','owm_city','owm_lat','owm_lon','owm_use_coords',
   'owm_unit','owm_interval_min','brightness','lang','time_12h','date_format',
   'anim_mode','seconds_mode','display_panel_cols','bottom_cycle_sec','scroll_speed_ms','forecast_scroll_up',
@@ -270,6 +299,7 @@ const fields=['sta_ssid','sta_pass','ap_password','wifi_timeout_sec','ntp1','ntp
   'color_sec','color_sec5','color_sec10'];
 // Select-Felder mit numerischen Werten (müssen als Int gespeichert werden)
 const numSelects=new Set(['owm_unit','time_12h','date_format','anim_mode','seconds_mode','display_panel_cols']);
+const secretFields=new Set(['sta_pass','ap_password','web_password','owm_apikey','ota_password']);
 
 let statusInterval=null;
 let statusLoading=false;
@@ -311,6 +341,23 @@ function fmtSec(s){
   return Math.floor(s/60)+'min '+( s%60)+'s';
 }
 
+function setStatusRows(rows){
+  const box=document.getElementById('statusBox');
+  box.textContent='';
+  rows.forEach(([label,value])=>{
+    const div=document.createElement('div');
+    const lbl=document.createElement('span');
+    const val=document.createElement('span');
+    lbl.className='lbl';
+    val.className='val';
+    lbl.textContent=label;
+    val.textContent=value;
+    div.appendChild(lbl);
+    div.appendChild(val);
+    box.appendChild(div);
+  });
+}
+
 async function loadConfig(){
   const r=await fetch('/api/config');
   const d=await r.json();
@@ -330,6 +377,7 @@ async function save(){
     if(el.type==='checkbox')d[f]=el.checked;
     else if(el.type==='number')d[f]=parseFloat(el.value)||0;
     else if(el.tagName==='SELECT'&&numSelects.has(f))d[f]=parseInt(el.value,10)||0;
+    else if(secretFields.has(f)&&el.value==='')return;
     else d[f]=el.value;
   });
   d.display_panel_rows=1;
@@ -346,27 +394,28 @@ async function loadStatus(){
     const d=await r.json();
     const verEl=document.getElementById('fwVer');
     if(verEl)verEl.textContent='v'+d.firmware.replace(/^.*\s/,'');
-    document.getElementById('statusBox').innerHTML=
-      '<div><span class="lbl">Firmware</span><span class="val">'+d.firmware+'</span></div>'+
-      '<div><span class="lbl">Display</span><span class="val">'+(d.display_layout||'-')+'</span></div>'+
-      '<div><span class="lbl">IP / mDNS</span><span class="val">'+d.ip+' / hub75clock.local</span></div>'+
-      '<div><span class="lbl">WLAN</span><span class="val">'+d.ssid+' ('+d.rssi+' dBm)</span></div>'+
-      '<div><span class="lbl">Uptime</span><span class="val">'+d.uptime+'</span></div>'+
-      '<div><span class="lbl">Uhrzeit</span><span class="val">'+d.time+'</span></div>'+
-      '<div><span class="lbl">Meldung</span><span class="val">'+(d.system_msg||'-')+'</span></div>'+
-      '<div><span class="lbl">Letzter Watchdog</span><span class="val">'+(d.last_watchdog||'-')+'</span></div>'+
-      '<div><span class="lbl">Watchdog-Zeitpunkt</span><span class="val">'+(d.watchdog_time||'-')+'</span></div>'+
-      '<div><span class="lbl">Watchdog-Phase</span><span class="val">'+(d.watchdog_phase||'-')+'</span></div>'+
-      '<div><span class="lbl">Watchdog-Zeit</span><span class="val">'+fmtSec(Math.floor((d.watchdog_age_ms||0)/1000))+'</span></div>'+
-      '<div><span class="lbl">Boot-Grund</span><span class="val">'+(d.boot_reason||'-')+'</span></div>'+
-      '<div><span class="lbl">NTP-Status</span><span class="val">'+d.ntp_status+'</span></div>'+
-      '<div><span class="lbl">Aktiver NTP-Server</span><span class="val">'+d.ntp_active+'</span></div>'+
-      '<div><span class="lbl">NTP-Server</span><span class="val">'+d.ntp_servers+'</span></div>'+
-      '<div><span class="lbl">Nächster NTP-Sync</span><span class="val">'+fmtSec(d.next_ntp_sec)+'</span></div>'+
-      '<div><span class="lbl">Wetter-Standort</span><span class="val">'+d.weather_loc+'</span></div>'+
-      '<div><span class="lbl">Wetter</span><span class="val">'+d.weather_status+'</span></div>'+
-      '<div><span class="lbl">Nächstes Wetter</span><span class="val">'+fmtSec(d.next_weather_sec)+'</span></div>'+
-      '<div><span class="lbl">Freier Heap</span><span class="val">'+d.heap+' Byte</span></div>';
+    setStatusRows([
+      ['Firmware',d.firmware||'-'],
+      ['Display',d.display_layout||'-'],
+      ['IP / mDNS',(d.ip||'-')+' / hub75clock.local'],
+      ['WLAN',(d.ssid||'-')+' ('+(d.rssi??'-')+' dBm)'],
+      ['Uptime',d.uptime||'-'],
+      ['Uhrzeit',d.time||'-'],
+      ['Meldung',d.system_msg||'-'],
+      ['Letzter Watchdog',d.last_watchdog||'-'],
+      ['Watchdog-Zeitpunkt',d.watchdog_time||'-'],
+      ['Watchdog-Phase',d.watchdog_phase||'-'],
+      ['Watchdog-Zeit',fmtSec(Math.floor((d.watchdog_age_ms||0)/1000))],
+      ['Boot-Grund',d.boot_reason||'-'],
+      ['NTP-Status',d.ntp_status||'-'],
+      ['Aktiver NTP-Server',d.ntp_active||'-'],
+      ['NTP-Server',d.ntp_servers||'-'],
+      ['Nächster NTP-Sync',fmtSec(d.next_ntp_sec||0)],
+      ['Wetter-Standort',d.weather_loc||'-'],
+      ['Wetter',d.weather_status||'-'],
+      ['Nächstes Wetter',fmtSec(d.next_weather_sec||0)],
+      ['Freier Heap',(d.heap??'-')+' Byte']
+    ]);
   }catch(e){
     document.getElementById('statusBox').textContent='Fehler beim Laden';
   }finally{
@@ -473,17 +522,23 @@ void webServerSetup() {
 
     // GET /api/config
     webServer.on("/api/config", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!_requireWebAuth(req)) return;
         JsonDocument doc;
         doc["sta_ssid"]         = cfg.sta_ssid;
-        doc["sta_pass"]         = cfg.sta_pass;
-        doc["ap_password"]      = cfg.ap_password;
+        doc["sta_pass"]         = "";
+        doc["sta_pass_configured"] = !cfg.sta_pass.isEmpty();
+        doc["ap_password"]      = "";
+        doc["ap_password_configured"] = !cfg.ap_password.isEmpty();
+        doc["web_password"]     = "";
+        doc["web_password_configured"] = !cfg.web_password.isEmpty();
         doc["wifi_timeout_sec"] = cfg.wifi_timeout_sec;
         doc["ntp1"]             = cfg.ntp1;
         doc["ntp2"]             = cfg.ntp2;
         doc["ntp3"]             = cfg.ntp3;
         doc["ntp_interval_min"] = cfg.ntp_interval_min;
         doc["tz"]               = cfg.tz;
-        doc["owm_apikey"]       = cfg.owm_apikey;
+        doc["owm_apikey"]       = "";
+        doc["owm_apikey_configured"] = !cfg.owm_apikey.isEmpty();
         doc["owm_city"]         = cfg.owm_city;
         doc["owm_lat"]          = cfg.owm_lat;
         doc["owm_lon"]          = cfg.owm_lon;
@@ -503,7 +558,8 @@ void webServerSetup() {
         doc["display_panel_rows"]  = cfg.display_panel_rows;
         doc["display_panel_map"]   = cfg.display_panel_map;
         doc["ota_enabled"]         = cfg.ota_enabled;
-        doc["ota_password"]     = cfg.ota_password;
+        doc["ota_password"]     = "";
+        doc["ota_password_configured"] = !cfg.ota_password.isEmpty();
         doc["color_digit"]      = cfg.color_digit;
         doc["color_date"]       = cfg.color_date;
         doc["color_temp"]       = cfg.color_temp;
@@ -521,21 +577,52 @@ void webServerSetup() {
         [](AsyncWebServerRequest* req) {},
         nullptr,
         [](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t) {
+            if (!_requireWebAuth(req)) return;
             JsonDocument doc;
             if (deserializeJson(doc, data, len)) {
                 req->send(400, "application/json", "{\"ok\":false,\"error\":\"JSON ungueltig\"}");
                 return;
             }
+            if (_jsonHasString(doc, "ap_password")) {
+                String newApPassword = _jsonString(doc, "ap_password");
+                if (!newApPassword.isEmpty() && newApPassword.length() < 8) {
+                    _sendJsonError(req, 400, "AP-Passwort muss mindestens 8 Zeichen haben");
+                    return;
+                }
+            }
+            if (_jsonHasString(doc, "web_password")) {
+                String newWebPassword = _jsonString(doc, "web_password");
+                if (!newWebPassword.isEmpty() && newWebPassword.length() < 8) {
+                    _sendJsonError(req, 400, "Web-Passwort muss mindestens 8 Zeichen haben");
+                    return;
+                }
+            }
+            bool oldOtaEnabled = cfg.ota_enabled;
+            String oldOtaPassword = cfg.ota_password;
+
             cfg.sta_ssid         = doc["sta_ssid"]         | cfg.sta_ssid.c_str();
-            cfg.sta_pass         = doc["sta_pass"]         | cfg.sta_pass.c_str();
-            cfg.ap_password      = doc["ap_password"]      | cfg.ap_password.c_str();
+            if (_jsonHasString(doc, "sta_pass")) {
+                String newPass = _jsonString(doc, "sta_pass");
+                if (!newPass.isEmpty()) cfg.sta_pass = newPass;
+            }
+            if (_jsonHasString(doc, "ap_password")) {
+                String newApPassword = _jsonString(doc, "ap_password");
+                if (!newApPassword.isEmpty()) cfg.ap_password = newApPassword;
+            }
+            if (_jsonHasString(doc, "web_password")) {
+                String newWebPassword = _jsonString(doc, "web_password");
+                if (!newWebPassword.isEmpty()) cfg.web_password = newWebPassword;
+            }
             cfg.wifi_timeout_sec = _clampU16(doc["wifi_timeout_sec"] | cfg.wifi_timeout_sec, 10, 120);
             cfg.ntp1             = doc["ntp1"]             | cfg.ntp1.c_str();
             cfg.ntp2             = doc["ntp2"]             | cfg.ntp2.c_str();
             cfg.ntp3             = doc["ntp3"]             | cfg.ntp3.c_str();
             cfg.ntp_interval_min = _clampU16(doc["ntp_interval_min"] | cfg.ntp_interval_min, 5, 1440);
             cfg.tz               = doc["tz"]               | cfg.tz.c_str();
-            cfg.owm_apikey       = doc["owm_apikey"]       | cfg.owm_apikey.c_str();
+            if (_jsonHasString(doc, "owm_apikey")) {
+                String newApiKey = _jsonString(doc, "owm_apikey");
+                if (!newApiKey.isEmpty()) cfg.owm_apikey = newApiKey;
+            }
             cfg.owm_city         = doc["owm_city"]         | cfg.owm_city.c_str();
             cfg.owm_lat          = doc["owm_lat"]          | cfg.owm_lat;
             cfg.owm_lon          = doc["owm_lon"]          | cfg.owm_lon;
@@ -559,7 +646,10 @@ void webServerSetup() {
             cfg.display_panel_rows = _clampU8(doc["display_panel_rows"] | cfg.display_panel_rows, 1, 1);
             cfg.display_panel_map  = _clampU8(doc["display_panel_map"]  | cfg.display_panel_map,  0, 1);
             cfg.ota_enabled        = doc["ota_enabled"]        | cfg.ota_enabled;
-            cfg.ota_password     = doc["ota_password"]     | cfg.ota_password.c_str();
+            if (_jsonHasString(doc, "ota_password")) {
+                String newOtaPassword = _jsonString(doc, "ota_password");
+                if (!newOtaPassword.isEmpty()) cfg.ota_password = newOtaPassword;
+            }
             cfg.color_digit      = doc["color_digit"]      | cfg.color_digit.c_str();
             cfg.color_date       = doc["color_date"]       | cfg.color_date.c_str();
             cfg.color_temp       = doc["color_temp"]       | cfg.color_temp.c_str();
@@ -569,17 +659,23 @@ void webServerSetup() {
             cfg.color_sec5       = doc["color_sec5"]       | cfg.color_sec5.c_str();
             cfg.color_sec10      = doc["color_sec10"]      | cfg.color_sec10.c_str();
 
-            extern MatrixPanel_I2S_DMA* dma_display;
             displaySetBrightness(cfg.brightness);
             colorsInit();
+            displayInvalidateStatic();
+            displayResetWeatherLine();
             // Wetter-Cache invalidieren → nächster Loop-Durchlauf ruft neu ab
             // (betrifft Sprache, Standort, Einheit und API-Key-Änderungen)
             lastWeatherFetch = 0;
-            configSave();
+            if (!configSave()) {
+                _sendJsonError(req, 500, "Konfiguration konnte nicht gespeichert werden");
+                return;
+            }
 
             bool restartRequired = (oldPanelCols != cfg.display_panel_cols)
                                 || (oldPanelRows != cfg.display_panel_rows)
-                                || (oldPanelMap  != cfg.display_panel_map);
+                                || (oldPanelMap  != cfg.display_panel_map)
+                                || (oldOtaEnabled != cfg.ota_enabled)
+                                || (oldOtaPassword != cfg.ota_password);
             String out;
             JsonDocument resp;
             resp["ok"] = true;
@@ -591,6 +687,7 @@ void webServerSetup() {
 
     // GET /api/status
     webServer.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!_requireWebAuth(req)) return;
         JsonDocument doc;
         uint32_t nowMs = millis();
 
@@ -679,6 +776,7 @@ void webServerSetup() {
     // GET /api/geocode?q={city}
     // Ruft OWM Geocoding API auf und liefert bis zu 5 Treffer zurück
     webServer.on("/api/geocode", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!_requireWebAuth(req)) return;
         if (!req->hasParam("q")) {
             req->send(400, "application/json", "{\"error\":\"Parameter q erforderlich\"}");
             return;
@@ -705,6 +803,7 @@ void webServerSetup() {
 
     // GET /api/reset
     webServer.on("/api/reset", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!_requireWebAuth(req)) return;
         configReset();
         req->send(200, "application/json", "{\"ok\":true}");
         factoryResetPending = true;
@@ -712,6 +811,7 @@ void webServerSetup() {
 
     // GET /api/restart — setzt Flag, main loop führt restart sicher durch
     webServer.on("/api/restart", HTTP_GET, [](AsyncWebServerRequest* req) {
+        if (!_requireWebAuth(req)) return;
         req->send(200, "application/json", "{\"ok\":true}");
         restartPending = true;
     });
@@ -719,6 +819,7 @@ void webServerSetup() {
     // POST /api/update - Firmware-Datei direkt ueber das Webinterface einspielen
     webServer.on("/api/update", HTTP_POST,
         [](AsyncWebServerRequest* req) {
+            if (!_requireWebAuth(req)) return;
             if (webUpdateOk) {
                 req->send(200, "application/json", "{\"ok\":true}");
                 restartPending = true;
@@ -732,6 +833,11 @@ void webServerSetup() {
         },
         [](AsyncWebServerRequest* req, const String& filename, size_t index,
            uint8_t* data, size_t len, bool final) {
+            if (!_webAuthOk(req)) {
+                webUpdateOk = false;
+                webUpdateError = "Nicht authentifiziert";
+                return;
+            }
             if (index == 0) {
                 webUpdateOk = false;
                 webUpdateError = "";
@@ -749,6 +855,7 @@ void webServerSetup() {
             }
 
             if (webUpdateError.isEmpty()) {
+                appWatchdogFeed();
                 if (Update.write(data, len) != len) {
                     webUpdateError = Update.errorString();
                 } else {
@@ -756,9 +863,11 @@ void webServerSetup() {
                     size_t total = req->contentLength() > 0 ? req->contentLength() : done;
                     displayShowOTA((uint32_t)done, (uint32_t)total);
                 }
+                appWatchdogFeed();
             }
 
             if (final) {
+                appWatchdogFeed();
                 if (!webUpdateError.isEmpty()) {
                     Update.abort();
                     otaRunning = false;

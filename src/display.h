@@ -690,6 +690,23 @@ static void _invalidateStaticDisplay() {
     datDirty = 2;
 }
 
+void displayInvalidateStatic() {
+    _invalidateStaticDisplay();
+}
+
+void displayResetWeatherLine() {
+    weatherMode = 0;
+    weatherLastMs = 0;
+    weatherScrollX256 = (int32_t)DISPLAY_W << 8;
+    weatherScrollMs = 0;
+    weatherScrollStr = "";
+    forecastTransitionActive = false;
+    forecastTransitionFrom = 1;
+    forecastTransitionTo = 1;
+    forecastTransitionStep = 0;
+    forecastTransitionMs = 0;
+}
+
 static uint16_t _fadeColor(uint16_t color, uint8_t fade) {
     if (fade >= 255) return color;
     if (fade == 0) return C_BLACK;

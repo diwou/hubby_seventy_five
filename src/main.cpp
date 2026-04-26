@@ -167,10 +167,20 @@ static void startAP() {
     snprintf(apSSID, sizeof(apSSID), "HUB75CLOCK-%02X%02X", mac[4], mac[5]);
 
     WiFi.mode(WIFI_AP);
+    bool apOk = false;
     if (cfg.ap_password.isEmpty()) {
-        WiFi.softAP(apSSID);
+        apOk = WiFi.softAP(apSSID);
+    } else if (cfg.ap_password.length() < 8) {
+        Serial.println("[AP] AP-Passwort ist zu kurz, starte offenen Konfigurations-AP.");
+        apOk = WiFi.softAP(apSSID);
     } else {
-        WiFi.softAP(apSSID, cfg.ap_password.c_str());
+        apOk = WiFi.softAP(apSSID, cfg.ap_password.c_str());
+    }
+    if (!apOk) {
+        Serial.println("[AP] softAP konnte nicht gestartet werden.");
+        lastStatusMsg = "AP Fehler";
+        displayShowMessage(lastStatusMsg, C_WARN);
+        return;
     }
     delay(200);
 
@@ -264,17 +274,6 @@ void setup() {
 
         if (cfg.ota_enabled) {
             otaSetup();
-        }
-
-        // Wetter direkt nach erfolgreichem WLAN/NTP-Setup anstoßen, damit es
-        // während des anschließenden IP-/Hostname-Scrolltexts bereits geladen ist.
-        if (!cfg.owm_apikey.isEmpty()) {
-            watchdogSetPhase("weather-fetch");
-            appWatchdogFeed();
-            if (fetchWeather()) {
-                lastWeatherFetch = millis();
-            }
-            appWatchdogFeed();
         }
 
         // IP als scrollender Text anzeigen

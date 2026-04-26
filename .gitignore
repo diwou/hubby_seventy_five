@@ -13,6 +13,7 @@ node_modules/
 
 # Von pio run -t compiledb generiert (4 MB, maschinenspezifisch)
 compile_commands.json
+include/version_generated.h
 
 # KI-/Agent-Konfiguration und lokale Assistenten-Dateien
 CLAUDE.md

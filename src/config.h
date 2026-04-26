@@ -2,12 +2,13 @@
 #include <Arduino.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
+#include <version_generated.h>
 
 // ============================================================
-// Firmware-Version — NUR HIER ändern!
+// Firmware-Version
 // ============================================================
 #ifndef FW_VERSION
-#define FW_VERSION "1.6.2"
+#define FW_VERSION APP_VERSION_BASE
 #endif
 
 #define CFG_FILE "/cfg.json"
@@ -65,6 +66,7 @@ struct Config {
     // OTA
     bool    ota_enabled       = true;
     String  ota_password      = "";
+    String  web_password      = "hub75clock";
 
     // System
     uint16_t wifi_timeout_sec = 30;
@@ -119,8 +121,11 @@ bool configLoad() {
     if (cfg.display_panel_map > 1) cfg.display_panel_map = 0;
     cfg.ota_enabled       = doc["ota_enabled"]       | true;
     cfg.ota_password      = doc["ota_password"]      | "";
+    cfg.web_password      = doc["web_password"]      | "hub75clock";
     cfg.wifi_timeout_sec  = doc["wifi_timeout_sec"]  | 30;
     cfg.ap_password       = doc["ap_password"]       | "";
+    if (!cfg.ap_password.isEmpty() && cfg.ap_password.length() < 8) cfg.ap_password = "";
+    if (!cfg.web_password.isEmpty() && cfg.web_password.length() < 8) cfg.web_password = "hub75clock";
     cfg.color_digit       = doc["color_digit"]       | "#FFC832";
     cfg.color_date        = doc["color_date"]        | "#64A0FF";
     cfg.color_temp        = doc["color_temp"]        | "#FF8C28";
@@ -165,6 +170,7 @@ bool configSave() {
     doc["display_panel_map"]   = cfg.display_panel_map;
     doc["ota_enabled"]         = cfg.ota_enabled;
     doc["ota_password"]     = cfg.ota_password;
+    doc["web_password"]     = cfg.web_password;
     doc["wifi_timeout_sec"] = cfg.wifi_timeout_sec;
     doc["ap_password"]      = cfg.ap_password;
     doc["color_digit"]      = cfg.color_digit;

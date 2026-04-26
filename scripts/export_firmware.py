@@ -10,11 +10,11 @@ CHIP_FAMILY = "ESP32-S3"
 
 
 def read_fw_version():
-    config_path = Path(env["PROJECT_DIR"]) / "src" / "config.h"
+    config_path = Path(env["PROJECT_DIR"]) / "include" / "config.h"
     text = config_path.read_text(encoding="utf-8")
-    match = re.search(r'#define\s+FW_VERSION\s+"([^"]+)"', text)
+    match = re.search(r'#define\s+APP_VERSION_BASE\s+"([^"]+)"', text)
     if not match:
-        raise ValueError("FW_VERSION konnte in src/config.h nicht gefunden werden")
+        raise ValueError("APP_VERSION_BASE konnte in include/config.h nicht gefunden werden")
     return match.group(1)
 
 

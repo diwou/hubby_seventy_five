@@ -6,11 +6,11 @@ Import("env")
 
 
 def read_fw_version():
-    config_path = Path(env["PROJECT_DIR"]) / "src" / "config.h"
+    config_path = Path(env["PROJECT_DIR"]) / "include" / "config.h"
     text = config_path.read_text(encoding="utf-8")
-    match = re.search(r'#define\s+FW_VERSION\s+"([^"]+)"', text)
+    match = re.search(r'#define\s+APP_VERSION_BASE\s+"([^"]+)"', text)
     if not match:
-        raise ValueError("FW_VERSION konnte in src/config.h nicht gefunden werden")
+        raise ValueError("APP_VERSION_BASE konnte in include/config.h nicht gefunden werden")
     return match.group(1)
 
 
@@ -37,6 +37,14 @@ def build_label(version: str) -> str:
 
 version = read_fw_version()
 label = build_label(version)
+generated_path = Path(env["PROJECT_DIR"]) / "include" / "version_generated.h"
+generated_path.write_text(
+    "#pragma once\n"
+    "// Automatisch durch scripts/version_label.py erzeugt. Nicht manuell pflegen.\n"
+    f"#define APP_VERSION_BASE \"{version}\"\n"
+    f"#define FW_VERSION \"{label}\"\n",
+    encoding="utf-8",
+)
 
 env["FW_VERSION_LABEL"] = label
 env.Append(CPPDEFINES=[("FW_VERSION", '\\"%s\\"' % label)])
