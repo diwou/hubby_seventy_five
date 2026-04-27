@@ -27,10 +27,12 @@ uint32_t lastWeatherFetch  = 0;
 uint32_t lastReconnectMs   = 0;
 bool     wifiConnected     = false;
 String   lastStatusMsg     = "";
+volatile bool weatherFetchActive = false;
 static constexpr uint32_t WATCHDOG_TIMEOUT_MS = 120000UL;
 static volatile uint32_t watchdogLastKickMs = 0;
 static TaskHandle_t watchdogTaskHandle = nullptr;
 static const char* watchdogPhase = "boot";
+static bool weatherFetchDisplayPending = false;
 RTC_DATA_ATTR char rtcLastWatchdog[160] = "";
 RTC_DATA_ATTR char rtcLastWatchdogPhase[32] = "";
 RTC_DATA_ATTR uint32_t rtcLastWatchdogAgeMs = 0;
@@ -52,6 +54,8 @@ static void resetRuntimeState() {
     lastWeatherFetch = 0;
     lastReconnectMs = 0;
     wifiConnected = false;
+    weatherFetchActive = false;
+    weatherFetchDisplayPending = false;
     lastStatusMsg = "";
     watchdogPhase = "boot";
     watchdogTaskHandle = nullptr;
@@ -103,6 +107,44 @@ static void setupWatchdog() {
         return;
     }
     Serial.printf("[WDT] Monitor aktiv (%lu ms)\n", (unsigned long)WATCHDOG_TIMEOUT_MS);
+}
+
+static void weatherFetchTask(void*) {
+    bool ok = fetchWeather();
+    if (ok) {
+        Serial.printf("[Weather] %.1f° — %s\n",
+                      weather.current_temp, weather.current_cond.c_str());
+    } else {
+        Serial.printf("[Weather] Fehler: %s\n",
+                      weather.error.isEmpty() ? "unbekannt" : weather.error.c_str());
+    }
+    weatherFetchActive = false;
+    vTaskDelete(nullptr);
+}
+
+static void startWeatherFetchAsync(uint32_t nowMs) {
+    if (weatherFetchActive) return;
+
+    lastWeatherFetch = nowMs;
+    weatherFetchActive = true;
+    weatherFetchDisplayPending = true;
+    displayResetWeatherLine();
+
+    BaseType_t rc = xTaskCreatePinnedToCore(
+        weatherFetchTask,
+        "weatherFetch",
+        10240,
+        nullptr,
+        1,
+        nullptr,
+        0);
+    if (rc != pdPASS) {
+        weatherFetchActive = false;
+        weather.valid = false;
+        weather.error = "Wetter-Task konnte nicht gestartet werden";
+        displayResetWeatherLine();
+        Serial.println("[Weather] Task konnte nicht gestartet werden");
+    }
 }
 
 const char* resetReasonName(esp_reset_reason_t reason) {
@@ -314,6 +356,11 @@ void loop() {
     }
     if (otaRunning) return;
 
+    if (weatherFetchDisplayPending && !weatherFetchActive) {
+        weatherFetchDisplayPending = false;
+        displayResetWeatherLine();
+    }
+
     // DNS-Server im AP-Modus
     if (apModeActive) {
         watchdogSetPhase("ap-mode");
@@ -386,15 +433,10 @@ void loop() {
 
     // Wetter-Aktualisierung
     uint32_t weatherInterval = (uint32_t)cfg.owm_interval_min * 60000UL;
-    if (!cfg.owm_apikey.isEmpty() && wifiConnected &&
+    if (!cfg.owm_apikey.isEmpty() && wifiConnected && !weatherFetchActive &&
         (lastWeatherFetch == 0 || nowMs - lastWeatherFetch >= weatherInterval)) {
-        lastWeatherFetch = nowMs;
         watchdogSetPhase("weather-fetch");
-        appWatchdogFeed();
-        fetchWeather();
-        appWatchdogFeed();
-        Serial.printf("[Weather] %.1f° — %s\n",
-                      weather.current_temp, weather.current_cond.c_str());
+        startWeatherFetchAsync(nowMs);
     }
 
     watchdogSetPhase("loop-idle");

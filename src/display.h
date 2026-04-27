@@ -814,6 +814,10 @@ static void _blitWeatherCanvas(Gfx& gfx) {
 }
 
 static void _buildCurrentStr() {
+    if (weatherFetchActive) {
+        weatherScrollStr = "Wetter...";
+        return;
+    }
     if (!weather.valid || cfg.owm_apikey.isEmpty()) {
         weatherScrollStr = cfg.owm_apikey.isEmpty() ? "Kein API-Key" : "Kein Wetter";
         return;
@@ -976,7 +980,7 @@ static void _drawWeatherLine() {
     static GFXcanvas16 weatherCanvas(displayWidth(), WEATHER_BAND_H);
     uint32_t now      = millis();
     uint32_t cyclems  = (uint32_t)cfg.bottom_cycle_sec * 1000UL;
-    uint8_t  maxMode  = (weather.valid && !cfg.owm_apikey.isEmpty()) ? 4 : 1;
+    uint8_t  maxMode  = (!weatherFetchActive && weather.valid && !cfg.owm_apikey.isEmpty()) ? 4 : 1;
 
     weatherCanvas.fillScreen(C_BLACK);
 

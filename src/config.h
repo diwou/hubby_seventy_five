@@ -12,6 +12,7 @@
 #endif
 
 #define CFG_FILE "/cfg.json"
+static const char* DEFAULT_WEB_PASSWORD = "hub75clock";
 
 // ============================================================
 // Konfigurationsstruktur
@@ -66,7 +67,7 @@ struct Config {
     // OTA
     bool    ota_enabled       = true;
     String  ota_password      = "";
-    String  web_password      = "hub75clock";
+    String  web_password      = DEFAULT_WEB_PASSWORD;
 
     // System
     uint16_t wifi_timeout_sec = 30;
@@ -121,11 +122,11 @@ bool configLoad() {
     if (cfg.display_panel_map > 1) cfg.display_panel_map = 0;
     cfg.ota_enabled       = doc["ota_enabled"]       | true;
     cfg.ota_password      = doc["ota_password"]      | "";
-    cfg.web_password      = doc["web_password"]      | "hub75clock";
+    cfg.web_password      = doc["web_password"]      | DEFAULT_WEB_PASSWORD;
     cfg.wifi_timeout_sec  = doc["wifi_timeout_sec"]  | 30;
     cfg.ap_password       = doc["ap_password"]       | "";
     if (!cfg.ap_password.isEmpty() && cfg.ap_password.length() < 8) cfg.ap_password = "";
-    if (!cfg.web_password.isEmpty() && cfg.web_password.length() < 8) cfg.web_password = "hub75clock";
+    if (cfg.web_password.length() < 8) cfg.web_password = DEFAULT_WEB_PASSWORD;
     cfg.color_digit       = doc["color_digit"]       | "#FFC832";
     cfg.color_date        = doc["color_date"]        | "#64A0FF";
     cfg.color_temp        = doc["color_temp"]        | "#FF8C28";

@@ -6,6 +6,7 @@
 #include "config.h"
 
 extern void appWatchdogFeed();
+extern volatile bool weatherFetchActive;
 
 // ============================================================
 // Wetter-Datenstruktur
@@ -81,8 +82,12 @@ static String _condEN(int id) {
     return "";
 }
 
+static String _condForLang(int id, const String& lang) {
+    return (lang == "de") ? _condDE(id) : _condEN(id);
+}
+
 static String _cond(int id) {
-    return (cfg.lang == "de") ? _condDE(id) : _condEN(id);
+    return _condForLang(id, cfg.lang);
 }
 
 // ============================================================
@@ -185,7 +190,15 @@ static int _dayDiff(const struct tm& nowTm, const struct tm& forecastTm) {
 // Wetter abrufen (Current + 5-day Forecast)
 // ============================================================
 bool fetchWeather() {
-    if (cfg.owm_apikey.isEmpty()) {
+    const String apiKey = cfg.owm_apikey;
+    const String lang = cfg.lang;
+    const uint8_t unit = cfg.owm_unit;
+    const bool useCoords = cfg.owm_use_coords;
+    const float lat = cfg.owm_lat;
+    const float lon = cfg.owm_lon;
+    const String cityConfig = cfg.owm_city;
+
+    if (apiKey.isEmpty()) {
         _setWeatherError("Kein API-Key");
         return false;
     }
@@ -194,24 +207,23 @@ bool fetchWeather() {
         return false;
     }
 
-    const String units  = (cfg.owm_unit == 0) ? "metric" : "imperial";
-    const String lang   = cfg.lang;
+    const String units  = (unit == 0) ? "metric" : "imperial";
     String locParam;
 
-    if (cfg.owm_use_coords) {
+    if (useCoords) {
         // Koordinaten direkt verwenden
-        locParam = "lat=" + String(cfg.owm_lat, 4) + "&lon=" + String(cfg.owm_lon, 4);
+        locParam = "lat=" + String(lat, 4) + "&lon=" + String(lon, 4);
     } else {
-        if (cfg.owm_city.isEmpty()) {
+        if (cityConfig.isEmpty()) {
             _setWeatherError("Kein Ort");
             return false;
         }
         // Stadtname via Geocoding API in Koordinaten auflösen, damit
         // dieselbe OWM-Station wie bei direkter lat/lon-Abfrage getroffen wird.
-        String city = cfg.owm_city;
+        String city = cityConfig;
         city.replace(" ", "+");
         String geoUrl = "https://api.openweathermap.org/geo/1.0/direct?q="
-                      + city + "&limit=1&appid=" + cfg.owm_apikey;
+                      + city + "&limit=1&appid=" + apiKey;
         HttpResult geoRes = _httpGet(geoUrl);
         bool geoOk = false;
         if (!geoRes.body.isEmpty()) {
@@ -233,7 +245,7 @@ bool fetchWeather() {
     // --- Aktuelles Wetter ---
     String url = "https://api.openweathermap.org/data/2.5/weather?" + locParam
                + "&units=" + units + "&lang=" + lang
-               + "&appid=" + cfg.owm_apikey;
+               + "&appid=" + apiKey;
     HttpResult currentRes = _httpGet(url);
     if (currentRes.body.isEmpty()) {
         _setWeatherError("Current: " + currentRes.error);
@@ -258,7 +270,7 @@ bool fetchWeather() {
     // --- 5-Tage / 3-Stunden Forecast ---
     url = "https://api.openweathermap.org/data/2.5/forecast?" + locParam
         + "&cnt=40&units=" + units + "&lang=" + lang
-        + "&appid=" + cfg.owm_apikey;
+        + "&appid=" + apiKey;
     HttpResult forecastRes = _httpGet(url);
     if (forecastRes.body.isEmpty()) {
         // Current weather war OK, Forecast nicht zwingend
@@ -352,13 +364,13 @@ bool fetchWeather() {
             weather.forecast[i].temp_day   = (dayMax[i]   > -999) ? dayMax[i]   : 0;
             weather.forecast[i].temp_night = (nightMin[i] <  999) ? nightMin[i] : 0;
             weather.forecast[i].condition  = dayCondDesc[i].isEmpty()
-                                             ? _cond(dayCondId[i])
+                                             ? _condForLang(dayCondId[i], lang)
                                              : dayCondDesc[i];
             weather.forecast[i].icon       = _owmIcon(dayIcon[i]);
         }
         weather.today.temp_day   = (todayMax > -999) ? todayMax : weather.current_temp;
         weather.today.temp_night = (todayMin <  999) ? todayMin : weather.current_temp;
-        weather.today.condition  = todayCondDesc.isEmpty() ? _cond(todayCondId) : todayCondDesc;
+        weather.today.condition  = todayCondDesc.isEmpty() ? _condForLang(todayCondId, lang) : todayCondDesc;
         weather.today.icon       = _owmIcon(todayIcon);
     }
 

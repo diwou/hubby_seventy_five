@@ -61,8 +61,7 @@ static uint16_t _clampU16(uint32_t value, uint16_t minVal, uint16_t maxVal) {
 }
 
 static bool _webAuthOk(AsyncWebServerRequest* req) {
-    return cfg.web_password.isEmpty()
-        || req->authenticate("admin", cfg.web_password.c_str(), "HUB75 Clock", false);
+    return req->authenticate("admin", cfg.web_password.c_str(), "HUB75 Clock", false);
 }
 
 static bool _requireWebAuth(AsyncWebServerRequest* req) {
@@ -752,7 +751,9 @@ void webServerSetup() {
         }
 
         // Wetter-Status
-        if (weather.valid) {
+        if (weatherFetchActive) {
+            doc["weather_status"] = "Abruf laeuft";
+        } else if (weather.valid) {
             char wb[48];
             snprintf(wb, sizeof(wb), "%.1f° — %s",
                      weather.current_temp, weatherDisplayTextToUtf8(weather.current_cond).c_str());
