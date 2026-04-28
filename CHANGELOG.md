@@ -11,6 +11,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ## [UNRELEASED]
 
 ### Fixed
+- Der aktuelle Wetter-Scroll berechnet seine Position jetzt aus einer festen Startzeit statt aus fortgeschriebenen Frame-Deltas, damit der Lauf gleichmaessiger bleibt und beim Durchlaufende sauber einfriert. [scroll-startzeit-20260428]
 - Der erste Wetterabruf nach dem Boot laeuft jetzt in einem eigenen Task, damit Uhr und Display nicht waehrend DNS-/HTTPS-/OWM-Wartezeiten stehen bleiben; leere Web-Passwoerter aus alten Konfigurationen werden beim Laden wieder auf den Standardzugang gesetzt. [fb5a44a]
 - Das Webinterface schuetzt Konfigurations-, Neustart-, Reset- und Firmware-Update-Endpunkte jetzt per HTTP Basic Auth, liefert gespeicherte Geheimnisse nicht mehr an `/api/config` aus und uebernimmt Passwortfelder nur noch, wenn wirklich ein neuer Wert gesendet wurde. [603e3f2]
 - Der Web-Firmware-Upload fuettert nun ebenfalls den App-Watchdog, damit lange Uploads nicht mehr durch den eigenen Monitor-Neustart abgebrochen werden. [603e3f2]

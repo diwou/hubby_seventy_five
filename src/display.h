@@ -666,7 +666,7 @@ static void _drawDateRight(struct tm* t) {
 static uint8_t   weatherMode      = 0;
 static uint32_t  weatherLastMs    = 0;
 static int32_t   weatherScrollX256 = (int32_t)DISPLAY_W << 8;
-static uint32_t  weatherScrollMs  = 0;
+static uint32_t  weatherScrollStartMs = 0;
 static String    weatherScrollStr = "";
 static bool      forecastTransitionActive = false;
 static uint8_t   forecastTransitionFrom    = 1;
@@ -698,13 +698,19 @@ void displayResetWeatherLine() {
     weatherMode = 0;
     weatherLastMs = 0;
     weatherScrollX256 = (int32_t)DISPLAY_W << 8;
-    weatherScrollMs = 0;
+    weatherScrollStartMs = 0;
     weatherScrollStr = "";
     forecastTransitionActive = false;
     forecastTransitionFrom = 1;
     forecastTransitionTo = 1;
     forecastTransitionStep = 0;
     forecastTransitionMs = 0;
+}
+
+static void _resetCurrentWeatherScroll(uint32_t now) {
+    weatherLastMs = now;
+    weatherScrollStartMs = now;
+    weatherScrollX256 = (int32_t)DISPLAY_W << 8;
 }
 
 static uint16_t _fadeColor(uint16_t color, uint8_t fade) {
@@ -924,8 +930,7 @@ static void _drawForecastTransition(Gfx& gfx, uint32_t now) {
             weatherLastMs = now;
             if (weatherMode == 0) {
                 _buildCurrentStr();
-                weatherScrollX256 = (int32_t)DISPLAY_W << 8;
-                weatherScrollMs = now;
+                _resetCurrentWeatherScroll(now);
             }
             break;
         }
@@ -986,10 +991,8 @@ static void _drawWeatherLine() {
 
     // Erstinitialisierung
     if (weatherScrollStr.isEmpty()) {
-        weatherLastMs = now;
         _buildCurrentStr();
-        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
-        weatherScrollMs = now;
+        _resetCurrentWeatherScroll(now);
     }
 
     if (forecastTransitionActive) {
@@ -1001,47 +1004,41 @@ static void _drawWeatherLine() {
     if (weatherMode == 0) {
         // --- Modus 0: aktuelles Wetter scrollend ---
         uint32_t scrollStepMs = (cfg.scroll_speed_ms == 0) ? 1UL : (uint32_t)cfg.scroll_speed_ms;
-        uint32_t scrollElapsed = now - weatherScrollMs;
-        if (scrollElapsed > 0) {
-            weatherScrollMs = now;
-            int textPx = _textWidthEx(weatherScrollStr);
-            if (textPx > DISPLAY_W - 4) {
-                int32_t deltaX256 = (int32_t)(((uint64_t)scrollElapsed * 256UL) / scrollStepMs);
-                weatherScrollX256 -= deltaX256;
-                if ((weatherScrollX256 >> 8) < -textPx) {
-                    weatherScrollX256 = (int32_t)(-textPx) << 8;  // einfrieren
-                    if (now - weatherLastMs >= cyclems) {
-                        weatherLastMs = now;
-                        if (maxMode > 1) {
-                            forecastTransitionActive = true;
-                            forecastTransitionFrom = 0;
-                            forecastTransitionTo = 1;
-                            forecastTransitionStep = 0;
-                            forecastTransitionMs = now;
-                        } else {
-                            _buildCurrentStr();  // kein Forecast: neu aufbauen
-                        }
-                        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
-                        weatherScrollMs = now;
-                    }
-                }
-            } else {
-                weatherScrollX256 = (int32_t)((DISPLAY_W - textPx) / 2) << 8;
-                if (now - weatherLastMs >= cyclems) {
+        int textPx = _textWidthEx(weatherScrollStr);
+        if (textPx > DISPLAY_W - 4) {
+            uint32_t scrollElapsed = now - weatherScrollStartMs;
+            int32_t startX256 = (int32_t)DISPLAY_W << 8;
+            int32_t endX256 = (int32_t)(-textPx) << 8;
+            int32_t deltaX256 = (int32_t)(((uint64_t)scrollElapsed * 256UL) / scrollStepMs);
+            weatherScrollX256 = startX256 - deltaX256;
+            if (weatherScrollX256 < endX256) weatherScrollX256 = endX256;
+
+            if (weatherScrollX256 <= endX256 && now - weatherLastMs >= cyclems) {
+                if (maxMode > 1) {
                     weatherLastMs = now;
-                    if (maxMode > 1) {
-                        forecastTransitionActive = true;
-                        forecastTransitionFrom = 0;
-                        forecastTransitionTo = 1;
-                        forecastTransitionStep = 0;
-                        forecastTransitionMs = now;
-                        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
-                        weatherScrollMs = now;
-                    } else {
-                        _buildCurrentStr();
-                        weatherScrollX256 = (int32_t)DISPLAY_W << 8;
-                        weatherScrollMs = now;
-                    }
+                    forecastTransitionActive = true;
+                    forecastTransitionFrom = 0;
+                    forecastTransitionTo = 1;
+                    forecastTransitionStep = 0;
+                    forecastTransitionMs = now;
+                } else {
+                    _buildCurrentStr();  // kein Forecast: neu aufbauen
+                    _resetCurrentWeatherScroll(now);
+                }
+            }
+        } else {
+            weatherScrollX256 = (int32_t)((DISPLAY_W - textPx) / 2) << 8;
+            if (now - weatherLastMs >= cyclems) {
+                if (maxMode > 1) {
+                    weatherLastMs = now;
+                    forecastTransitionActive = true;
+                    forecastTransitionFrom = 0;
+                    forecastTransitionTo = 1;
+                    forecastTransitionStep = 0;
+                    forecastTransitionMs = now;
+                } else {
+                    _buildCurrentStr();
+                    _resetCurrentWeatherScroll(now);
                 }
             }
         }
@@ -1162,7 +1159,7 @@ void displayReset() {
     colonFrame = -1; colonFrameMs = 0; colonLastSec = -1;
     lastSecondsMode = 255;
     weatherMode = 0; weatherLastMs = 0;
-    weatherScrollX256 = (int32_t)DISPLAY_W << 8; weatherScrollMs = 0;
+    weatherScrollX256 = (int32_t)DISPLAY_W << 8; weatherScrollStartMs = 0;
     weatherScrollStr = "";
     forecastTransitionActive = false;
     forecastTransitionFrom = 1;
