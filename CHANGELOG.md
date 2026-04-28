@@ -11,6 +11,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ## [UNRELEASED]
 
 ### Fixed
+- Die Subpixel-Ueberblendung des aktuellen Wetterlaufbands wurde wieder entfernt, weil sie die Buchstaben beim Scrollen sichtbar unscharf wirken liess. [scroll-subpixel-ruecknahme-20260428]
 - Das aktuelle Wetterlaufband nutzt jetzt eine leichte Subpixel-Ueberblendung zwischen benachbarten Pixelspalten, damit die ganzen Pixel-Schritte weniger ruckelig wirken. [scroll-subpixel-20260428]
 - Der aktuelle Wetter-Scroll berechnet seine Position jetzt aus einer festen Startzeit statt aus fortgeschriebenen Frame-Deltas, damit der Lauf gleichmaessiger bleibt und beim Durchlaufende sauber einfriert. [scroll-startzeit-20260428]
 - Der erste Wetterabruf nach dem Boot laeuft jetzt in einem eigenen Task, damit Uhr und Display nicht waehrend DNS-/HTTPS-/OWM-Wartezeiten stehen bleiben; leere Web-Passwoerter aus alten Konfigurationen werden beim Laden wieder auf den Standardzugang gesetzt. [fb5a44a]
