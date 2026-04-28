@@ -756,6 +756,29 @@ static void _drawCharEx(Gfx& gfx, int x, int y, uint8_t c, uint16_t color) {
     }
 }
 
+template<typename Gfx>
+static void _drawCharExTransparent(Gfx& gfx, int x, int y, uint8_t c, uint16_t color) {
+    if (c == (uint8_t)NARROW_SPACE_MARKER) return;
+    char base = 0;
+    bool upper = false;
+    switch (c) {
+        case 0xE4: base = 'a'; break;                // ä
+        case 0xF6: base = 'o'; break;                // ö
+        case 0xFC: base = 'u'; break;                // ü
+        case 0xC4: base = 'A'; upper = true; break;  // Ä
+        case 0xD6: base = 'O'; upper = true; break;  // Ö
+        case 0xDC: base = 'U'; upper = true; break;  // Ü
+    }
+    if (base) {
+        gfx.drawChar(x, y, base, color, color, 1);
+        int dotY = upper ? y - 2 : y;
+        gfx.drawPixel(x + 1, dotY, color);
+        gfx.drawPixel(x + 3, dotY, color);
+    } else {
+        gfx.drawChar(x, y, (char)c, color, color, 1);
+    }
+}
+
 static inline int _glyphAdvance(uint8_t c) {
     return (c == (uint8_t)NARROW_SPACE_MARKER) ? NARROW_SPACE_PX : 6;
 }
@@ -777,6 +800,26 @@ static int _printStrEx(Gfx& gfx, int x, int y, const String& s, uint16_t color) 
         x += _glyphAdvance(c);
     }
     return x;
+}
+
+// Zeichnet den Lauftext mit einfacher Subpixel-Ueberblendung zwischen zwei Pixelspalten.
+template<typename Gfx>
+static int _printStrExSubpixel(Gfx& gfx, int32_t x256, int y, const String& s, uint16_t color) {
+    int x = (int)(x256 >> 8);
+    uint8_t frac = (uint8_t)(x256 & 0xFF);
+    if (frac == 0) return _printStrEx(gfx, x, y, s, color);
+
+    uint16_t leftColor = _fadeColor(color, (uint8_t)(255 - frac));
+    uint16_t rightColor = _fadeColor(color, frac);
+    const uint8_t* p = (const uint8_t*)s.c_str();
+    int pos = x;
+    while (*p) {
+        uint8_t c = *p++;
+        _drawCharExTransparent(gfx, pos, y, c, leftColor);
+        _drawCharExTransparent(gfx, pos + 1, y, c, rightColor);
+        pos += _glyphAdvance(c);
+    }
+    return pos;
 }
 
 template<typename Gfx>
@@ -939,7 +982,7 @@ static void _drawForecastTransition(Gfx& gfx, uint32_t now) {
     if (!forecastTransitionActive) {
         if (weatherMode == 0) {
             gfx.setTextSize(1);
-            _printStrEx(gfx, (int)(weatherScrollX256 >> 8), WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
+            _printStrExSubpixel(gfx, weatherScrollX256, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
         } else {
             _drawForecastStatic(gfx, weatherMode - 1, 0, 255);
         }
@@ -1043,7 +1086,7 @@ static void _drawWeatherLine() {
             }
         }
         weatherCanvas.setTextSize(1);
-        _printStrEx(weatherCanvas, (int)(weatherScrollX256 >> 8), WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
+        _printStrExSubpixel(weatherCanvas, weatherScrollX256, WEATHER_BAND_Y, weatherScrollStr, C_TEMP);
         _blitWeatherCanvas(weatherCanvas);
         return;
     }
