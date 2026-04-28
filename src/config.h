@@ -44,7 +44,7 @@ struct Config {
     uint8_t brightness        = 90;      // 0-255
     String  lang              = "de";    // "de" oder "en"
     uint8_t bottom_cycle_sec  = 6;       // Wechselintervall untere Zeile (s)
-    uint8_t scroll_speed_ms   = 80;      // Scroll-Geschwindigkeit (ms/Pixel, 30-200)
+    uint8_t scroll_speed_ms   = 40;      // Scroll-Geschwindigkeit (ms/Pixel, 30-200)
     uint8_t time_12h          = 0;       // 0=24h, 1=12h (AM/PM)
     uint8_t date_format       = 0;       // 0=Mo TT.MM.JJ  1=Mo TT.MM  2=TT.MM.JJJJ  3=MM/TT/JJ (US)
     uint8_t anim_mode         = 0;       // 0=Slide-Up, 1=Cross-Dissolve
@@ -106,7 +106,8 @@ bool configLoad() {
     cfg.brightness        = doc["brightness"]        | 90;
     cfg.lang              = doc["lang"]              | "de";
     cfg.bottom_cycle_sec  = doc["bottom_cycle_sec"]  | 6;
-    cfg.scroll_speed_ms   = doc["scroll_speed_ms"]   | 80;
+    cfg.scroll_speed_ms   = doc["scroll_speed_ms"]   | 40;
+    if (cfg.scroll_speed_ms == 80) cfg.scroll_speed_ms = 40; // alten Standard auf weicheren Lauf migrieren
     cfg.time_12h          = doc["time_12h"]          | 0;
     cfg.date_format       = doc["date_format"]       | 0;
     cfg.anim_mode         = doc["anim_mode"]         | 0;

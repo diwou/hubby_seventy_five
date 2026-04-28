@@ -372,7 +372,7 @@ Alle Einstellungen werden in `/cfg.json` auf dem LittleFS-Dateisystem gespeicher
 | `display_panel_rows` | `1` | Vorbereitung für späteres 2×2-Layout; derzeit im Webinterface fest auf `1` |
 | `display_panel_map` | `0` | Vorbereitung für Mapping-Modi: `0` = linear, `1` = ZigZag/Serpentine; derzeit noch nicht im Webinterface auswählbar |
 | `bottom_cycle_sec` | `6` | Wechselintervall der Wetterzeile in Sekunden |
-| `scroll_speed_ms` | `80` | Scroll-Geschwindigkeit in ms pro Pixel (30–200) |
+| `scroll_speed_ms` | `40` | Scroll-Geschwindigkeit in ms pro Pixel (30–200) |
 
 **Datumsformate:**
 

@@ -11,6 +11,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ## [UNRELEASED]
 
 ### Fixed
+- OTA-Fortschrittsanzeigen werden jetzt gedrosselt, damit ArduinoOTA- und Web-Firmware-Uploads nicht durch zu haeufige Display-Redraws ausgebremst oder abgebrochen werden. [ota-progress-drossel-20260428]
 - Die Subpixel-Ueberblendung des aktuellen Wetterlaufbands wurde wieder entfernt, weil sie die Buchstaben beim Scrollen sichtbar unscharf wirken liess. [scroll-subpixel-ruecknahme-20260428]
 - Das aktuelle Wetterlaufband nutzt jetzt eine leichte Subpixel-Ueberblendung zwischen benachbarten Pixelspalten, damit die ganzen Pixel-Schritte weniger ruckelig wirken. [scroll-subpixel-20260428]
 - Der aktuelle Wetter-Scroll berechnet seine Position jetzt aus einer festen Startzeit statt aus fortgeschriebenen Frame-Deltas, damit der Lauf gleichmaessiger bleibt und beim Durchlaufende sauber einfriert. [scroll-startzeit-20260428]
@@ -22,6 +23,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - Ungueltig kurze AP-Passwoerter werden serverseitig abgelehnt und der AP-Start prueft den Rueckgabewert von `WiFi.softAP()`, statt Fehler still zu uebergehen. [603e3f2]
 
 ### Changed
+- Der Standardwert fuer die Wetter-Scrollgeschwindigkeit wurde von `80` auf `40 ms/Pixel` gesetzt; gespeicherte alte Standardwerte `80` werden beim Laden auf den weicheren Lauf migriert. [scroll-standard-20260428]
 - Die `6` im `HH:MM:SS`-Font wurde noch einmal nachkorrigiert, damit der letzte Rahmen oben und unten wieder sauber schließt. [b25ff24]
 - OWM laeuft jetzt ausschliesslich per HTTPS, die Geocoding-Suche sendet den API-Key nicht mehr aus dem Browser, und `displayReset()` setzt den Sekunden-Mode-Zustand sauber mit zurueck. [2a2b83f]
 - Die `HH:MM:SS`-Ziffern verwenden jetzt exakt die neue 7×14-Glyphen-Tabelle mit 2px-starken Strichen und bleiben damit wieder sauber lesbar. [961f516]

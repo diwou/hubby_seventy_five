@@ -682,6 +682,8 @@ static int WEATHER_BAND_Y = WEATHER_TEXT_Y - WEATHER_CLEAR_Y;
 static int       datLastMday  = -1;
 static uint8_t   datDirty     = 2;
 static bool      displayOtaActive = false;
+static uint32_t  displayOtaLastDrawMs = 0;
+static uint8_t   displayOtaLastPct = 255;
 
 static void _invalidateStaticDisplay() {
     for (int i = 0; i < 6; i++) {
@@ -1066,12 +1068,24 @@ static void _drawWeatherLine() {
 // ============================================================
 void displaySetOtaActive(bool active) {
     displayOtaActive = active;
+    displayOtaLastDrawMs = 0;
+    displayOtaLastPct = 255;
     if (!active) _invalidateStaticDisplay();
 }
 
 void displayShowOTA(uint32_t progress, uint32_t total) {
     displayOtaActive = true;
     _invalidateStaticDisplay();
+    uint32_t now = millis();
+    uint8_t pctVal = (total > 0) ? (uint8_t)((progress * 100UL) / total) : 0;
+    if (pctVal > 100) pctVal = 100;
+    bool forceDraw = (progress == 0) || (total > 0 && progress >= total);
+    if (!forceDraw && pctVal == displayOtaLastPct && now - displayOtaLastDrawMs < 250UL) {
+        return;
+    }
+    displayOtaLastDrawMs = now;
+    displayOtaLastPct = pctVal;
+
     dma_display->clearScreen();
     dma_display->setTextSize(1);
     dma_display->setTextColor(C_WARN);
@@ -1086,7 +1100,6 @@ void displayShowOTA(uint32_t progress, uint32_t total) {
 
     // Prozent-Anzeige
     char pct[5];
-    uint32_t pctVal = (total > 0) ? (progress * 100 / total) : 0;
     snprintf(pct, sizeof(pct), "%3u%%", (unsigned)pctVal);
     dma_display->setTextColor(C_DATE);
     dma_display->setCursor(16, 22);
