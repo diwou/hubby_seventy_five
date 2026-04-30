@@ -11,6 +11,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ## [UNRELEASED]
 
 ### Fixed
+- Nach einem echten Power-On- oder Brownout-Reset wartet die Firmware jetzt kurz auf stabile Versorgung und fuehrt danach genau einmal einen kontrollierten Soft-Neustart aus. Das bildet den bisher noetigen manuellen Reset-Tastendruck nach, ohne bei normalen Software-Neustarts eine Reset-Schleife zu erzeugen. [power-on-soft-reset-20260430]
 - OTA-Fortschrittsanzeigen werden jetzt gedrosselt, damit ArduinoOTA- und Web-Firmware-Uploads nicht durch zu haeufige Display-Redraws ausgebremst oder abgebrochen werden. [ota-progress-drossel-20260428]
 - Die Subpixel-Ueberblendung des aktuellen Wetterlaufbands wurde wieder entfernt, weil sie die Buchstaben beim Scrollen sichtbar unscharf wirken liess. [scroll-subpixel-ruecknahme-20260428]
 - Das aktuelle Wetterlaufband nutzt jetzt eine leichte Subpixel-Ueberblendung zwischen benachbarten Pixelspalten, damit die ganzen Pixel-Schritte weniger ruckelig wirken. [scroll-subpixel-20260428]

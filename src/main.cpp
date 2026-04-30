@@ -29,10 +29,13 @@ bool     wifiConnected     = false;
 String   lastStatusMsg     = "";
 volatile bool weatherFetchActive = false;
 static constexpr uint32_t WATCHDOG_TIMEOUT_MS = 120000UL;
+static constexpr uint32_t POWERON_RESTART_DELAY_MS = 1500UL;
+static constexpr uint32_t POWERON_RESTART_MAGIC = 0x48554237UL; // "HUB7"
 static volatile uint32_t watchdogLastKickMs = 0;
 static TaskHandle_t watchdogTaskHandle = nullptr;
 static const char* watchdogPhase = "boot";
 static bool weatherFetchDisplayPending = false;
+RTC_DATA_ATTR uint32_t rtcPowerOnRestartMagic = 0;
 RTC_DATA_ATTR char rtcLastWatchdog[160] = "";
 RTC_DATA_ATTR char rtcLastWatchdogPhase[32] = "";
 RTC_DATA_ATTR uint32_t rtcLastWatchdogAgeMs = 0;
@@ -164,6 +167,19 @@ const char* resetReasonName(esp_reset_reason_t reason) {
     }
 }
 
+static bool needsPowerOnSettleRestart(esp_reset_reason_t reason) {
+    bool coldReset = (reason == ESP_RST_POWERON || reason == ESP_RST_BROWNOUT);
+    if (!coldReset) {
+        rtcPowerOnRestartMagic = 0;
+        return false;
+    }
+
+    if (rtcPowerOnRestartMagic == POWERON_RESTART_MAGIC) return false;
+
+    rtcPowerOnRestartMagic = POWERON_RESTART_MAGIC;
+    return true;
+}
+
 // ============================================================
 // WiFi: Station-Modus verbinden
 // ============================================================
@@ -266,12 +282,21 @@ void setup() {
     watchdogSetPhase("setup");
     Serial.begin(115200);
     delay(300);
+    esp_reset_reason_t bootReason = esp_reset_reason();
+    displayPreparePins();
+    if (needsPowerOnSettleRestart(bootReason)) {
+        Serial.printf("\n\n[Boot] %s: warte %lu ms und starte einmal neu...\n",
+                      resetReasonName(bootReason),
+                      (unsigned long)POWERON_RESTART_DELAY_MS);
+        delay(POWERON_RESTART_DELAY_MS);
+        ESP.restart();
+    }
+
     resetRuntimeState();
     setupWatchdog();
-    displayPreparePins();
     Serial.printf("\n\n=== HUB75 Clock %s ===\n", FW_VERSION);
     Serial.printf("[Boot] Reset-Grund: %s (%d)\n",
-                  resetReasonName(esp_reset_reason()), (int)esp_reset_reason());
+                  resetReasonName(bootReason), (int)bootReason);
 
     // LittleFS
     if (!LittleFS.begin(true)) {
