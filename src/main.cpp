@@ -126,9 +126,12 @@ static void updateBme680Readings(bool force = false) {
 
     if ((long)(now - bmeMeasureDueMs) < 0) return;
     if (!bme.endReading()) {
-        bmeDiag = "Messung fehlgeschlagen";
         bmeMeasureActive = false;
-        return;
+        // Fallback: direkte Messung, falls Async-Ende sporadisch fehlschlaegt.
+        if (!bme.performReading()) {
+            bmeDiag = "Messung fehlgeschlagen";
+            return;
+        }
     }
 
     bmeTempC = bme.temperature;
@@ -435,10 +438,11 @@ static void detectI2cDevices() {
     if (hasBme680 && i2cBme680Address >= 0) {
         bmeOk = bme.begin((uint8_t)i2cBme680Address);
         if (bmeOk) {
-            bme.setTemperatureOversampling(BME68X_OS_8X);
-            bme.setHumidityOversampling(BME68X_OS_2X);
-            bme.setPressureOversampling(BME68X_OS_4X);
-            bme.setIIRFilterSize(BME68X_FILTER_SIZE_3);
+            // Schnellere Reaktion auf Umgebungsänderungen (z. B. Kaeltespray).
+            bme.setTemperatureOversampling(BME68X_OS_2X);
+            bme.setHumidityOversampling(BME68X_OS_1X);
+            bme.setPressureOversampling(BME68X_OS_1X);
+            bme.setIIRFilterSize(BME680_FILTER_SIZE_0);
             // Fuer stabile Umgebungswerte (Temp/Feuchte) den Gas-Heizer deaktivieren,
             // sonst dominiert Eigenerwaermung der Messzelle.
             bme.setGasHeater(0, 0);

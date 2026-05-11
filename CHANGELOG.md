@@ -55,7 +55,9 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 - BME680 misst jetzt konsequent alle 2 Sekunden, auch waehrend `Wetter...`; es gibt dabei keine Pausen oder Drosselung mehr. [efefb83]
 
-- BME680 Non-Blocking-Timing korrigiert: `beginReading()` liefert einen absoluten Zielzeitpunkt, der nicht erneut mit `millis()` addiert werden darf; dadurch aktualisiert `Letzte BME-Messung` wieder wie erwartet statt minutenlang hochzuzaehlen. [pending]
+- BME680 Non-Blocking-Timing korrigiert: `beginReading()` liefert einen absoluten Zielzeitpunkt, der nicht erneut addiert werden darf; dadurch aktualisiert `Letzte BME-Messung` wieder wie erwartet statt minutenlang anzusteigen. [d4aa36d]
+
+- BME680-Anzeige wurde auf schnelle Umweltreaktion getrimmt: geringere Filterung/Oversampling sowie Fallback auf `performReading()`, falls `endReading()` fehlschlaegt. Dadurch reagiert die Temperaturanzeige deutlich direkter auf starke Kuehlung. [pending]
 
 - Hardware-Reset und I2C-Basis wurden auf die neue Verdrahtung angepasst: Factory-Reset liegt jetzt auf GPIO3 (Long-Press), der I2C-Bus auf SDA GPIO38 und SCL GPIO39; beim Boot prueft die Firmware jetzt gezielt DS3231 (`0x68`), VEML7700 (`0x10`) und BME680 (`0x76/0x77`) und meldet fehlende Geraete im Status. [65932e8]
 
