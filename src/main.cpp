@@ -74,6 +74,8 @@ float bmeHumidityPct = NAN;
 float bmePressureHpa = NAN;
 float bmeGasKOhm = NAN;
 uint32_t lastBmeReadMs = 0;
+bool bmeMeasureActive = false;
+uint32_t bmeMeasureDueMs = 0;
 bool rtcTimeValid = false;
 String rtcTimeSource = "keine";
 String rtcTimeSourceDetail = "";
@@ -104,17 +106,37 @@ static void refreshI2cStatusSummary() {
 static void updateBme680Readings(bool force = false) {
     if (!bmeOk) return;
     uint32_t now = millis();
-    if (!force && (now - lastBmeReadMs) < 2000UL) return;
-    if (!bme.performReading()) {
-        bmeDiag = "Messung fehlgeschlagen";
+    if (force) {
+        bmeMeasureActive = false;
+        bmeMeasureDueMs = 0;
+    }
+
+    if (!bmeMeasureActive) {
+        if (!force && (now - lastBmeReadMs) < 2000UL) return;
+        uint32_t delayMs = bme.beginReading();
+        if (delayMs == 0) {
+            bmeDiag = "Messung start fehlgeschlagen";
+            return;
+        }
+        bmeMeasureDueMs = now + delayMs;
+        bmeMeasureActive = true;
         return;
     }
+
+    if ((long)(now - bmeMeasureDueMs) < 0) return;
+    if (!bme.endReading()) {
+        bmeDiag = "Messung fehlgeschlagen";
+        bmeMeasureActive = false;
+        return;
+    }
+
     bmeTempC = bme.temperature;
     bmeHumidityPct = bme.humidity;
     bmePressureHpa = bme.pressure / 100.0f;
     bmeGasKOhm = bme.gas_resistance / 1000.0f;
     bmeDiag = "Messung OK";
     lastBmeReadMs = now;
+    bmeMeasureActive = false;
 }
 
 static inline uint8_t _bcdToDec(uint8_t v) { return (uint8_t)(((v >> 4) * 10) + (v & 0x0F)); }
