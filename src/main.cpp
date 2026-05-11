@@ -113,12 +113,13 @@ static void updateBme680Readings(bool force = false) {
 
     if (!bmeMeasureActive) {
         if (!force && (now - lastBmeReadMs) < 2000UL) return;
-        uint32_t delayMs = bme.beginReading();
-        if (delayMs == 0) {
+        uint32_t readyAtMs = bme.beginReading();
+        if (readyAtMs == 0) {
             bmeDiag = "Messung start fehlgeschlagen";
             return;
         }
-        bmeMeasureDueMs = now + delayMs;
+        // beginReading() liefert bereits den absoluten millis()-Zeitpunkt.
+        bmeMeasureDueMs = readyAtMs;
         bmeMeasureActive = true;
         return;
     }
