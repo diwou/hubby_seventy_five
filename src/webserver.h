@@ -175,6 +175,8 @@ input[type=checkbox]{width:auto;margin-right:6px}
     <label>Zeit <input id="rtc_time" type="time" step="1"></label>
   </div>
   <button class="btn btn-save" onclick="rtcSetNow()">RTC setzen</button>
+  <hr style="border-color:#333;margin:12px 0">
+  <div class="status-box" id="rtcStatusBox">Lade...</div>
 </div>
 
 <!-- WLAN -->
@@ -287,6 +289,9 @@ input[type=checkbox]{width:auto;margin-right:6px}
   <label>Wetter-Wechselintervall (s) <input id="bottom_cycle_sec" type="number" min="2" max="60"></label>
   <label>Scroll-Geschwindigkeit (ms/Pixel, 30=schnell … 200=langsam) <input id="scroll_speed_ms" type="number" min="30" max="200"></label>
   <label><input type="checkbox" id="auto_brightness"> Auto-Helligkeit per VEML7700</label>
+  <hr style="border-color:#333;margin:12px 0">
+  <div class="status-box" id="vemlStatusBox">Lade...</div>
+  <hr style="border-color:#333;margin:12px 0">
   <label><input type="checkbox" id="forecast_scroll_up"> Vorhersage-Kacheln von unten einscrollen</label>
   <hr style="border-color:#333;margin:12px 0">
   <p style="font-size:.85em;color:#aaa;margin-bottom:4px">Farben</p>
@@ -345,7 +350,8 @@ function show(id,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('p-'+id).classList.add('active');
   el.classList.add('active');
-  if(id==='status'){startStatusTimer();loadStatus();}else{stopStatusTimer();}
+  loadStatus();
+  if(id==='status'){startStatusTimer();}else{stopStatusTimer();}
 }
 
 function startStatusTimer(){
@@ -390,8 +396,9 @@ function fmtSec(s){
   return Math.floor(s/60)+'min '+( s%60)+'s';
 }
 
-function setStatusRows(rows){
-  const box=document.getElementById('statusBox');
+function setStatusRows(boxId,rows){
+  const box=document.getElementById(boxId);
+  if(!box)return;
   box.textContent='';
   rows.forEach(([label,value])=>{
     const div=document.createElement('div');
@@ -448,7 +455,7 @@ async function loadStatus(){
     const d=await r.json();
     const verEl=document.getElementById('fwVer');
     if(verEl)verEl.textContent='v'+d.firmware.replace(/^.*\s/,'');
-    setStatusRows([
+    setStatusRows('statusBox',[
       ['Firmware',d.firmware||'-'],
       ['Display',d.display_layout||'-'],
       ['IP / mDNS',(d.ip||'-')+' / hub75clock.local'],
@@ -463,9 +470,22 @@ async function loadStatus(){
       ['Boot-Grund',d.boot_reason||'-'],
       ['OTA aktiviert',d.ota_enabled?'Ja':'Nein'],
       ['OTA-Passwort',d.ota_password_set?'gesetzt':'leer'],
+      ['NTP-Status',d.ntp_status||'-'],
+      ['Aktiver NTP-Server',d.ntp_active||'-'],
+      ['Nächster NTP-Sync',fmtSec(d.next_ntp_sec||0)],
+      ['I2C-Status',d.i2c_status||'-'],
+      ['I2C-Scan',d.i2c_scan||'-'],
+      ['Wetter-Standort',d.weather_loc||'-'],
+      ['Wetter',d.weather_status||'-'],
+      ['Nächstes Wetter',fmtSec(d.next_weather_sec||0)],
+      ['Freier Heap',(d.heap??'-')+' Byte']
+    ]);
+
+    setStatusRows('rtcStatusBox',[
       ['RTC vorhanden',d.rtc_present?'ja':'nein'],
       ['RTC gültig',d.rtc_valid?'ja':'nein'],
       ['I2C',d.i2c_rtc_diag||'-'],
+      ['DS3231',d.i2c_ds3231||'-'],
       ['Zeitquelle',d.time_source||'-'],
       ['Info',d.time_source_detail||'-'],
       ['RTC-Datum',d.rtc_date||'-'],
@@ -473,27 +493,21 @@ async function loadStatus(){
       ['RTC geschrieben vor',fmtSec(Math.floor((d.rtc_write_age_ms||0)/1000))],
       ['RTC Zeit',d.rtc_time||'-'],
       ['Letzter NTP-Sync',d.ntp_last_sync||'-'],
-      ['NTP-Status',d.ntp_status||'-'],
-      ['Aktiver NTP-Server',d.ntp_active||'-'],
-      ['NTP-Server',d.ntp_servers||'-'],
-      ['Nächster NTP-Sync',fmtSec(d.next_ntp_sec||0)],
-      ['I2C-Status',d.i2c_status||'-'],
-      ['I2C-Scan',d.i2c_scan||'-'],
-      ['DS3231',d.i2c_ds3231||'-'],
+      ['NTP-Server',d.ntp_servers||'-']
+    ]);
+
+    setStatusRows('vemlStatusBox',[
       ['VEML7700',d.i2c_veml7700||'-'],
       ['VEML aktiv',d.veml_ok?'ja':'nein'],
       ['VEML-Diag',d.veml_diag||'-'],
       ['Auto-Helligkeit',d.auto_brightness?'an':'aus'],
+      ['Max-Helligkeit',d.brightness_max??'-'],
       ['Lux aktuell',d.veml_lux_current||'-'],
       ['Lux gefiltert',d.veml_lux_filt||'-'],
       ['Lux gehalten',d.veml_lux_hold||'-'],
       ['BME680',d.i2c_bme680||'-'],
       ['BME680-Adresse',d.i2c_bme680_addr||'-'],
-      ['BME680-Chip-ID',d.i2c_bme680_chipid||'-'],
-      ['Wetter-Standort',d.weather_loc||'-'],
-      ['Wetter',d.weather_status||'-'],
-      ['Nächstes Wetter',fmtSec(d.next_weather_sec||0)],
-      ['Freier Heap',(d.heap??'-')+' Byte']
+      ['BME680-Chip-ID',d.i2c_bme680_chipid||'-']
     ]);
   }catch(e){
     document.getElementById('statusBox').textContent='Fehler beim Laden';
@@ -798,6 +812,7 @@ void webServerSetup() {
         doc["watchdog_age_ms"] = rtcLastWatchdogAgeMs;
         doc["ota_enabled"] = cfg.ota_enabled;
         doc["ota_password_set"] = !cfg.ota_password.isEmpty();
+        doc["brightness_max"] = cfg.brightness;
         doc["rtc_present"] = i2cDs3231Present;
         doc["time_source"] = rtcTimeSource;
         doc["time_source_detail"] = rtcTimeSourceDetail;

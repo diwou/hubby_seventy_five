@@ -80,6 +80,8 @@ unsigned long luxWarmupUntilMs = 0;
 unsigned long lastLuxMs = 0;
 unsigned long vemlRetryAtMs = 0;
 uint8_t vemlRetryCount = 0;
+unsigned long lastBrightnessApplyMs = 0;
+uint8_t appliedBrightness = 0;
 
 static void refreshI2cStatusSummary() {
     i2cStatusSummary = String("DS3231:")
@@ -426,21 +428,28 @@ static void retryLightSensorIfNeeded() {
 }
 
 static void updateBrightnessFromLux(bool force = false) {
+    auto applyBrightness = [&](uint8_t value, bool immediate = false) {
+        if (immediate || value != appliedBrightness) {
+            displaySetBrightness(value);
+            appliedBrightness = value;
+            lastBrightnessApplyMs = millis();
+        }
+    };
+
     if (!vemlOk || !cfg.auto_brightness) {
-        displaySetBrightness(cfg.brightness);
+        applyBrightness(cfg.brightness, force);
         return;
     }
     unsigned long now = millis();
     if (!force && (long)(now - luxWarmupUntilMs) < 0) {
-        displaySetBrightness(cfg.brightness);
         return;
     }
-    if (!force && now - lastLuxMs < 250) return;
+    if (!force && now - lastLuxMs < 1200) return;
     lastLuxMs = now;
 
     float lux = veml.readLux();
     if (!isfinite(lux) || lux < 0.0f) {
-        displaySetBrightness(cfg.brightness);
+        // Bei Lesefehlern letzte Helligkeit halten, um Flackern zu vermeiden.
         return;
     }
     luxCurrent = lux;
@@ -461,7 +470,17 @@ static void updateBrightnessFromLux(bool force = false) {
             else if (luxFilt < luxHold - 1.2f) luxHold = luxFilt;
         }
     }
-    displaySetBrightness(luxToBrightness(luxHold));
+    uint8_t target = luxToBrightness(luxHold);
+    if (target > cfg.brightness) target = cfg.brightness;
+    if (force) {
+        applyBrightness(target, true);
+        return;
+    }
+    int delta = (int)target - (int)appliedBrightness;
+    if (delta < 0) delta = -delta;
+    if (delta >= 3 && (now - lastBrightnessApplyMs >= 1200UL)) {
+        applyBrightness(target, false);
+    }
 }
 
 static void startWeatherFetchAsync(uint32_t nowMs) {
@@ -675,6 +694,8 @@ void setup() {
 
     // Display mit Double-Buffering
     displayInit();
+    appliedBrightness = displayStartupBrightness();
+    lastBrightnessApplyMs = millis();
     colorsInit();
 
     // Startmeldung in Back-Buffer schreiben und zeigen
