@@ -105,10 +105,6 @@ static void refreshI2cStatusSummary() {
 
 static void updateBme680Readings(bool force = false) {
     if (!bmeOk) return;
-    if (!force && weatherFetchActive) {
-        bmeMeasureActive = false;
-        return;
-    }
     uint32_t now = millis();
     if (force) {
         bmeMeasureActive = false;
