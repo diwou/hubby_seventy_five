@@ -869,10 +869,10 @@ static void _drawForecastStatic(Gfx& gfx, int idx, int yOff = 0, uint8_t fade = 
     // Breite: "Fre"(18) + " "(6) + dayT + " C / " + nightT + " C" → zentriert
     int dayPx   = strlen(dayBuf)   * 6;
     int nightPx = strlen(nightBuf) * 6;
-    int compactSpacePx = 2;
+    int compactSpacePx = 1;
     int unitPx  = (compact ? compactSpacePx : NARROW_SPACE_PX) + 6;
     int dayNamePx = dayName.length() * 6;
-    int dayGapPx = compact ? 4 : 6;
+    int dayGapPx = compact ? 2 : 6;
     int sepPx = compact ? (compactSpacePx + 6 + compactSpacePx) : 18;
     int totalW  = dayNamePx + dayGapPx + dayPx + unitPx + sepPx + nightPx + unitPx;
     int x       = max(0, (DISPLAY_W - totalW) / 2);
@@ -917,10 +917,10 @@ static void _drawForecastStaticClippedToWeather(Gfx& gfx, int idx, int yOff, uin
 
     int dayPx     = strlen(dayBuf) * 6;
     int nightPx   = strlen(nightBuf) * 6;
-    int compactSpacePx = 2;
+    int compactSpacePx = 1;
     int unitPx    = (compact ? compactSpacePx : NARROW_SPACE_PX) + 6;
     int dayNamePx = dayName.length() * 6;
-    int dayGapPx  = compact ? 4 : 6;
+    int dayGapPx  = compact ? 2 : 6;
     int sepPx     = compact ? (compactSpacePx + 6 + compactSpacePx) : 18;
     int totalW    = dayNamePx + dayGapPx + dayPx + unitPx + sepPx + nightPx + unitPx;
     int x         = max(0, (DISPLAY_W - totalW) / 2);
