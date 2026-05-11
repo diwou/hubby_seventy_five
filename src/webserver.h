@@ -360,18 +360,18 @@ function show(id,el){
   document.getElementById('p-'+id).classList.add('active');
   el.classList.add('active');
   loadStatus();
-  if(id==='status'){startStatusTimer();}else{stopStatusTimer();}
+  updateStatusTimerHint();
 }
 
 function startStatusTimer(){
-  stopStatusTimer();
-  const t=document.getElementById('statusTimer');
-  t.textContent='Aktualisierung jede Sekunde';
+  if(statusInterval)return;
   statusInterval=setInterval(()=>{loadStatus();},1000);
+  updateStatusTimerHint();
 }
-function stopStatusTimer(){
-  if(statusInterval){clearInterval(statusInterval);statusInterval=null;}
-  document.getElementById('statusTimer').textContent='';
+function updateStatusTimerHint(){
+  const t=document.getElementById('statusTimer');
+  const statusVisible=document.getElementById('p-status').classList.contains('active');
+  t.textContent=statusVisible?'Aktualisierung jede Sekunde':'';
 }
 
 function toggleCoords(){
