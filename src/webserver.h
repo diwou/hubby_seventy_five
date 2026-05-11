@@ -56,6 +56,13 @@ extern String   vemlDiag;
 extern float    luxCurrent;
 extern float    luxFilt;
 extern float    luxHold;
+extern bool     bmeOk;
+extern String   bmeDiag;
+extern float    bmeTempC;
+extern float    bmeHumidityPct;
+extern float    bmePressureHpa;
+extern float    bmeGasKOhm;
+extern uint32_t lastBmeReadMs;
 bool rtcGetEpoch(time_t& outEpoch);
 bool rtcSetEpoch(time_t epoch);
 
@@ -239,6 +246,8 @@ input[type=checkbox]{width:auto;margin-right:6px}
   </label>
   <label>Abruf-Intervall (min) <input id="owm_interval_min" type="number" min="10" max="1440"></label>
   <button class="btn btn-save" onclick="save()">Speichern</button>
+  <hr style="border-color:#333;margin:12px 0">
+  <div class="status-box" id="bmeStatusBox">Lade...</div>
 </div>
 
 <!-- ANZEIGE -->
@@ -508,6 +517,19 @@ async function loadStatus(){
       ['BME680',d.i2c_bme680||'-'],
       ['BME680-Adresse',d.i2c_bme680_addr||'-'],
       ['BME680-Chip-ID',d.i2c_bme680_chipid||'-']
+    ]);
+
+    setStatusRows('bmeStatusBox',[
+      ['BME680 erkannt',d.i2c_bme680||'-'],
+      ['BME680 aktiv',d.bme_ok?'ja':'nein'],
+      ['BME680-Diag',d.bme_diag||'-'],
+      ['BME680-Adresse',d.i2c_bme680_addr||'-'],
+      ['BME680-Chip-ID',d.i2c_bme680_chipid||'-'],
+      ['Temperatur',d.bme_temp_c||'--'],
+      ['Luftfeuchte',d.bme_humidity_pct||'--'],
+      ['Luftdruck',d.bme_pressure_hpa||'--'],
+      ['Gaswiderstand',d.bme_gas_k_ohm||'--'],
+      ['Letzte BME-Messung',fmtSec(Math.floor((d.bme_read_age_ms||0)/1000))]
     ]);
   }catch(e){
     document.getElementById('statusBox').textContent='Fehler beim Laden';
@@ -891,6 +913,17 @@ void webServerSetup() {
         } else {
             doc["i2c_bme680_chipid"] = "--";
         }
+        doc["bme_ok"] = bmeOk;
+        doc["bme_diag"] = bmeDiag;
+        if (isfinite(bmeTempC)) doc["bme_temp_c"] = String(bmeTempC, 1) + " C";
+        else doc["bme_temp_c"] = "--";
+        if (isfinite(bmeHumidityPct)) doc["bme_humidity_pct"] = String(bmeHumidityPct, 1) + " %";
+        else doc["bme_humidity_pct"] = "--";
+        if (isfinite(bmePressureHpa)) doc["bme_pressure_hpa"] = String(bmePressureHpa, 1) + " hPa";
+        else doc["bme_pressure_hpa"] = "--";
+        if (isfinite(bmeGasKOhm)) doc["bme_gas_k_ohm"] = String(bmeGasKOhm, 1) + " kOhm";
+        else doc["bme_gas_k_ohm"] = "--";
+        doc["bme_read_age_ms"] = lastBmeReadMs ? (nowMs - lastBmeReadMs) : 0;
 
         // Wetter-Standort (zur Diagnose)
         if (cfg.owm_apikey.isEmpty()) {

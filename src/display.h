@@ -864,15 +864,16 @@ static void _drawForecastStatic(Gfx& gfx, int idx, int yOff = 0, uint8_t fade = 
     String dayName = forecastDayName(idx + 1);
     bool compact = (DISPLAY_W <= 64);
     if (compact && dayName.length() > 2) dayName = dayName.substring(0, 2);
-    String sepText = compact ? String(NARROW_SPACE_MARKER) + "/" + String(NARROW_SPACE_MARKER) : String(" / ");
+    String sepText = compact ? String("/") : String(" / ");
 
     // Breite: "Fre"(18) + " "(6) + dayT + " C / " + nightT + " C" → zentriert
     int dayPx   = strlen(dayBuf)   * 6;
     int nightPx = strlen(nightBuf) * 6;
-    int unitPx  = (compact ? (NARROW_SPACE_PX - 1) : NARROW_SPACE_PX) + 6;
+    int compactSpacePx = 2;
+    int unitPx  = (compact ? compactSpacePx : NARROW_SPACE_PX) + 6;
     int dayNamePx = dayName.length() * 6;
     int dayGapPx = compact ? 4 : 6;
-    int sepPx = compact ? (NARROW_SPACE_PX + 6 + NARROW_SPACE_PX) : 18;
+    int sepPx = compact ? (compactSpacePx + 6 + compactSpacePx) : 18;
     int totalW  = dayNamePx + dayGapPx + dayPx + unitPx + sepPx + nightPx + unitPx;
     int x       = max(0, (DISPLAY_W - totalW) / 2);
     const int y = _weatherBandY() + yOff;
@@ -888,11 +889,16 @@ static void _drawForecastStatic(Gfx& gfx, int idx, int yOff = 0, uint8_t fade = 
     x += dayNamePx + dayGapPx;
 
     x = _drawTempWithUnit(gfx, x, y, dayBuf, tempCol, unit, infoCol);
-    if (compact) x -= 1;
+    if (compact) x -= (NARROW_SPACE_PX - compactSpacePx);
 
     gfx.setTextColor(infoCol);
-    gfx.setCursor(x, y);
-    _printStrEx(gfx, x, y, sepText, infoCol);
+    if (compact) {
+        gfx.setCursor(x + compactSpacePx, y);
+        gfx.print("/");
+    } else {
+        gfx.setCursor(x, y);
+        _printStrEx(gfx, x, y, sepText, infoCol);
+    }
     x += sepPx;
 
     x = _drawTempWithUnit(gfx, x, y, nightBuf, dateCol, unit, infoCol);
@@ -907,14 +913,15 @@ static void _drawForecastStaticClippedToWeather(Gfx& gfx, int idx, int yOff, uin
     String dayName = forecastDayName(idx + 1);
     bool compact = (DISPLAY_W <= 64);
     if (compact && dayName.length() > 2) dayName = dayName.substring(0, 2);
-    String sepText = compact ? String(NARROW_SPACE_MARKER) + "/" + String(NARROW_SPACE_MARKER) : String(" / ");
+    String sepText = compact ? String("/") : String(" / ");
 
     int dayPx     = strlen(dayBuf) * 6;
     int nightPx   = strlen(nightBuf) * 6;
-    int unitPx    = (compact ? (NARROW_SPACE_PX - 1) : NARROW_SPACE_PX) + 6;
+    int compactSpacePx = 2;
+    int unitPx    = (compact ? compactSpacePx : NARROW_SPACE_PX) + 6;
     int dayNamePx = dayName.length() * 6;
     int dayGapPx  = compact ? 4 : 6;
-    int sepPx     = compact ? (NARROW_SPACE_PX + 6 + NARROW_SPACE_PX) : 18;
+    int sepPx     = compact ? (compactSpacePx + 6 + compactSpacePx) : 18;
     int totalW    = dayNamePx + dayGapPx + dayPx + unitPx + sepPx + nightPx + unitPx;
     int x         = max(0, (DISPLAY_W - totalW) / 2);
     const int y   = _weatherBandY() + yOff;
@@ -927,9 +934,10 @@ static void _drawForecastStaticClippedToWeather(Gfx& gfx, int idx, int yOff, uin
     x += dayNamePx + dayGapPx;
 
     x = _drawTempWithUnitClippedToWeather(gfx, x, y, dayBuf, tempCol, unit, infoCol);
-    if (compact) x -= 1;
+    if (compact) x -= (NARROW_SPACE_PX - compactSpacePx);
 
-    _printTextClippedToWeather(gfx, x, y, sepText, infoCol);
+    if (compact) _printTextClippedToWeather(gfx, x + compactSpacePx, y, sepText, infoCol);
+    else _printTextClippedToWeather(gfx, x, y, sepText, infoCol);
     x += sepPx;
 
     x = _drawTempWithUnitClippedToWeather(gfx, x, y, nightBuf, dateCol, unit, infoCol);

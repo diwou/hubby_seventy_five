@@ -12,6 +12,7 @@
 #include <LittleFS.h>
 #include <Wire.h>
 #include <Adafruit_VEML7700.h>
+#include <Adafruit_BME680.h>
 #include <time.h>
 #include <sys/time.h>
 #include <math.h>
@@ -55,6 +56,7 @@ static constexpr uint32_t FACTORY_RESET_HOLD_MS = 4000UL;
 static uint32_t factoryResetPressStartMs = 0;
 static bool factoryResetHandled = false;
 Adafruit_VEML7700 veml;
+Adafruit_BME680 bme;
 bool i2cDs3231Present = false;
 bool i2cVEML7700Present = false;
 bool i2cBme680Present = false;
@@ -65,6 +67,13 @@ String i2cStatusSummary = "nicht geprueft";
 String i2cBusScanSummary = "-";
 int i2cBme680Address = -1;
 int i2cBme680ChipId = -1;
+bool bmeOk = false;
+String bmeDiag = "nicht gefunden";
+float bmeTempC = NAN;
+float bmeHumidityPct = NAN;
+float bmePressureHpa = NAN;
+float bmeGasKOhm = NAN;
+uint32_t lastBmeReadMs = 0;
 bool rtcTimeValid = false;
 String rtcTimeSource = "keine";
 String rtcTimeSourceDetail = "";
@@ -90,6 +99,22 @@ static void refreshI2cStatusSummary() {
                     + (i2cVEML7700Present ? "OK" : "fehlt")
                     + " BME680:"
                     + (i2cBme680Present ? "OK" : "fehlt");
+}
+
+static void updateBme680Readings(bool force = false) {
+    if (!bmeOk) return;
+    uint32_t now = millis();
+    if (!force && (now - lastBmeReadMs) < 2000UL) return;
+    if (!bme.performReading()) {
+        bmeDiag = "Messung fehlgeschlagen";
+        return;
+    }
+    bmeTempC = bme.temperature;
+    bmeHumidityPct = bme.humidity;
+    bmePressureHpa = bme.pressure / 100.0f;
+    bmeGasKOhm = bme.gas_resistance / 1000.0f;
+    bmeDiag = "Messung OK";
+    lastBmeReadMs = now;
 }
 
 static inline uint8_t _bcdToDec(uint8_t v) { return (uint8_t)(((v >> 4) * 10) + (v & 0x0F)); }
@@ -380,6 +405,23 @@ static void detectI2cDevices() {
     if (!i2cDs3231Present) {
         rtcTimeValid = false;
         rtcSetSource("keine", "DS3231 nicht gefunden");
+    }
+
+    bmeOk = false;
+    bmeDiag = "nicht gefunden";
+    if (hasBme680 && i2cBme680Address >= 0) {
+        bmeOk = bme.begin((uint8_t)i2cBme680Address);
+        if (bmeOk) {
+            bme.setTemperatureOversampling(BME68X_OS_8X);
+            bme.setHumidityOversampling(BME68X_OS_2X);
+            bme.setPressureOversampling(BME68X_OS_4X);
+            bme.setIIRFilterSize(BME68X_FILTER_SIZE_3);
+            bme.setGasHeater(320, 150);
+            bmeDiag = "Init OK";
+            updateBme680Readings(true);
+        } else {
+            bmeDiag = "Init fehlgeschlagen";
+        }
     }
 
     vemlOk = hasVEML7700 && veml.begin();
@@ -787,6 +829,7 @@ void loop() {
 
     retryLightSensorIfNeeded();
     updateBrightnessFromLux();
+    updateBme680Readings();
 
     if (weatherFetchDisplayPending && !weatherFetchActive) {
         weatherFetchDisplayPending = false;
