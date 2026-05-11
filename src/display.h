@@ -188,7 +188,7 @@ void colorsInit() {
 static constexpr int DIGIT_VISIBLE_H_HHMM   = 16;
 static constexpr int DIGIT_VISIBLE_H_HHMMSS = 14;
 static constexpr char NARROW_SPACE_MARKER   = '\x1f';
-static constexpr int  NARROW_SPACE_PX       = 3;
+static constexpr int  NARROW_SPACE_PX       = 2;
 
 // ============================================================
 // Bitmap-Font 10×14: modern, bold (3px horizontal, 2px vertikal)
