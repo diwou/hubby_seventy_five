@@ -13,6 +13,14 @@
 
 #define CFG_FILE "/cfg.json"
 static const char* DEFAULT_WEB_PASSWORD = "hub75clock";
+static const char* DEFAULT_COLOR_DIGIT  = "#FFC832";
+static const char* DEFAULT_COLOR_DATE   = "#64A0FF";
+static const char* DEFAULT_COLOR_TEMP   = "#FF8C28";
+static const char* DEFAULT_COLOR_WARN   = "#FFDC00";
+static const char* DEFAULT_COLOR_INFO   = "#A0A0A0";
+static const char* DEFAULT_COLOR_SEC    = "#C88C14";
+static const char* DEFAULT_COLOR_SEC5   = "#00DC46";
+static const char* DEFAULT_COLOR_SEC10  = "#50DCFF";
 
 // ============================================================
 // Konfigurationsstruktur
@@ -55,14 +63,14 @@ struct Config {
     uint8_t display_panel_map  = 0;      // 0=linear, 1=zigzag/serpentine (fuer spaeteres 2x2)
 
     // Farben (hex #RRGGBB)
-    String  color_digit     = "#FFC832";   // Ziffern Gold/Amber
-    String  color_date      = "#64A0FF";   // Datum-Text
-    String  color_temp      = "#FF8C28";   // Temperatur
-    String  color_warn      = "#FFDC00";   // Wochentag/Warnung
-    String  color_info      = "#A0A0A0";   // Grau/Info
-    String  color_sec       = "#C88C14";   // Sekunden-Balken
-    String  color_sec5      = "#00DC46";   // 5s-Marke
-    String  color_sec10     = "#50DCFF";   // 10s-Marke
+    String  color_digit     = DEFAULT_COLOR_DIGIT; // Ziffern Gold/Amber
+    String  color_date      = DEFAULT_COLOR_DATE;  // Datum-Text
+    String  color_temp      = DEFAULT_COLOR_TEMP;  // Temperatur
+    String  color_warn      = DEFAULT_COLOR_WARN;  // Wochentag/Warnung
+    String  color_info      = DEFAULT_COLOR_INFO;  // Grau/Info
+    String  color_sec       = DEFAULT_COLOR_SEC;   // Sekunden-Balken
+    String  color_sec5      = DEFAULT_COLOR_SEC5;  // 5s-Marke
+    String  color_sec10     = DEFAULT_COLOR_SEC10; // 10s-Marke
 
     // OTA
     bool    ota_enabled       = true;
@@ -75,6 +83,65 @@ struct Config {
 };
 
 Config cfg;
+
+static bool _isHexColor(const String& value) {
+    if (value.length() != 7 || value[0] != '#') return false;
+    for (size_t i = 1; i < 7; i++) {
+        char c = value[i];
+        bool isNum = (c >= '0' && c <= '9');
+        bool isHexLower = (c >= 'a' && c <= 'f');
+        bool isHexUpper = (c >= 'A' && c <= 'F');
+        if (!isNum && !isHexLower && !isHexUpper) return false;
+    }
+    return true;
+}
+
+static inline void _sanitizeHexColor(String& value, const char* fallback) {
+    if (!_isHexColor(value)) value = fallback;
+}
+
+static inline void configSanitizeColors() {
+    _sanitizeHexColor(cfg.color_digit, DEFAULT_COLOR_DIGIT);
+    _sanitizeHexColor(cfg.color_date, DEFAULT_COLOR_DATE);
+    _sanitizeHexColor(cfg.color_temp, DEFAULT_COLOR_TEMP);
+    _sanitizeHexColor(cfg.color_warn, DEFAULT_COLOR_WARN);
+    _sanitizeHexColor(cfg.color_info, DEFAULT_COLOR_INFO);
+    _sanitizeHexColor(cfg.color_sec, DEFAULT_COLOR_SEC);
+    _sanitizeHexColor(cfg.color_sec5, DEFAULT_COLOR_SEC5);
+    _sanitizeHexColor(cfg.color_sec10, DEFAULT_COLOR_SEC10);
+}
+
+static inline void _sanitizeTextField(String& value, size_t maxLen) {
+    String out;
+    out.reserve(value.length());
+    for (size_t i = 0; i < value.length(); i++) {
+        char c = value[i];
+        if ((uint8_t)c < 32 || (uint8_t)c == 127) continue;
+        out += c;
+        if (out.length() >= maxLen) break;
+    }
+    value = out;
+}
+
+static inline void configSanitize() {
+    _sanitizeTextField(cfg.sta_ssid, 32);
+    _sanitizeTextField(cfg.sta_pass, 64);
+    _sanitizeTextField(cfg.ntp1, 64);
+    _sanitizeTextField(cfg.ntp2, 64);
+    _sanitizeTextField(cfg.ntp3, 64);
+    _sanitizeTextField(cfg.tz, 64);
+    _sanitizeTextField(cfg.owm_apikey, 64);
+    _sanitizeTextField(cfg.owm_city, 64);
+    _sanitizeTextField(cfg.lang, 8);
+    _sanitizeTextField(cfg.ap_password, 32);
+    _sanitizeTextField(cfg.web_password, 32);
+    _sanitizeTextField(cfg.ota_password, 32);
+
+    if (cfg.lang != "de" && cfg.lang != "en") cfg.lang = "de";
+    if (!cfg.ap_password.isEmpty() && cfg.ap_password.length() < 8) cfg.ap_password = "";
+    if (cfg.web_password.length() < 8) cfg.web_password = DEFAULT_WEB_PASSWORD;
+    configSanitizeColors();
+}
 
 // ============================================================
 // Persistenz (LittleFS / JSON)
@@ -126,20 +193,20 @@ bool configLoad() {
     cfg.web_password      = doc["web_password"]      | DEFAULT_WEB_PASSWORD;
     cfg.wifi_timeout_sec  = doc["wifi_timeout_sec"]  | 30;
     cfg.ap_password       = doc["ap_password"]       | "";
-    if (!cfg.ap_password.isEmpty() && cfg.ap_password.length() < 8) cfg.ap_password = "";
-    if (cfg.web_password.length() < 8) cfg.web_password = DEFAULT_WEB_PASSWORD;
-    cfg.color_digit       = doc["color_digit"]       | "#FFC832";
-    cfg.color_date        = doc["color_date"]        | "#64A0FF";
-    cfg.color_temp        = doc["color_temp"]        | "#FF8C28";
-    cfg.color_warn        = doc["color_warn"]        | "#FFDC00";
-    cfg.color_info        = doc["color_info"]        | "#A0A0A0";
-    cfg.color_sec         = doc["color_sec"]         | "#C88C14";
-    cfg.color_sec5        = doc["color_sec5"]        | "#00DC46";
-    cfg.color_sec10       = doc["color_sec10"]       | "#50DCFF";
+    cfg.color_digit       = doc["color_digit"]       | DEFAULT_COLOR_DIGIT;
+    cfg.color_date        = doc["color_date"]        | DEFAULT_COLOR_DATE;
+    cfg.color_temp        = doc["color_temp"]        | DEFAULT_COLOR_TEMP;
+    cfg.color_warn        = doc["color_warn"]        | DEFAULT_COLOR_WARN;
+    cfg.color_info        = doc["color_info"]        | DEFAULT_COLOR_INFO;
+    cfg.color_sec         = doc["color_sec"]         | DEFAULT_COLOR_SEC;
+    cfg.color_sec5        = doc["color_sec5"]        | DEFAULT_COLOR_SEC5;
+    cfg.color_sec10       = doc["color_sec10"]       | DEFAULT_COLOR_SEC10;
+    configSanitize();
     return true;
 }
 
 bool configSave() {
+    configSanitize();
     File f = LittleFS.open(CFG_FILE, "w");
     if (!f) return false;
 

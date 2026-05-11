@@ -10,7 +10,9 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <LittleFS.h>
+#include <Wire.h>
 #include <time.h>
+#include <sys/time.h>
 #include <cstring>
 
 #include "config.h"
@@ -40,6 +42,37 @@ RTC_DATA_ATTR char rtcLastWatchdog[160] = "";
 RTC_DATA_ATTR char rtcLastWatchdogPhase[32] = "";
 RTC_DATA_ATTR uint32_t rtcLastWatchdogAgeMs = 0;
 RTC_DATA_ATTR uint32_t rtcLastWatchdogEpoch = 0;
+static constexpr int PIN_FACTORY_RESET = 3;
+static constexpr int I2C_PIN_SDA = 38;
+static constexpr int I2C_PIN_SCL = 39;
+static constexpr uint8_t I2C_ADDR_DS3231 = 0x68;
+static constexpr uint8_t I2C_ADDR_VEML7700 = 0x10;
+static constexpr uint8_t I2C_ADDR_BME680_0 = 0x76;
+static constexpr uint8_t I2C_ADDR_BME680_1 = 0x77;
+static constexpr uint32_t FACTORY_RESET_HOLD_MS = 4000UL;
+static uint32_t factoryResetPressStartMs = 0;
+static bool factoryResetHandled = false;
+bool i2cDs3231Present = false;
+bool i2cVEML7700Present = false;
+bool i2cBme680Present = false;
+String i2cStatusSummary = "nicht geprueft";
+String i2cBusScanSummary = "-";
+int i2cBme680Address = -1;
+int i2cBme680ChipId = -1;
+bool rtcTimeValid = false;
+String rtcTimeSource = "keine";
+String rtcTimeSourceDetail = "";
+uint32_t lastRtcReadMs = 0;
+uint32_t lastRtcWriteMs = 0;
+
+static inline uint8_t _bcdToDec(uint8_t v) { return (uint8_t)(((v >> 4) * 10) + (v & 0x0F)); }
+static inline uint8_t _decToBcd(uint8_t v) { return (uint8_t)((((v / 10) & 0x0F) << 4) | (v % 10)); }
+static bool applySystemTimeEpoch(time_t epoch, bool writeRtc, const String& source, const String& detail = "");
+
+static void rtcSetSource(const String& source, const String& detail = "") {
+    rtcTimeSource = source;
+    rtcTimeSourceDetail = detail;
+}
 
 static void watchdogSetPhase(const char* phase) {
     watchdogPhase = phase;
@@ -123,6 +156,184 @@ static void weatherFetchTask(void*) {
     }
     weatherFetchActive = false;
     vTaskDelete(nullptr);
+}
+
+static bool i2cProbeAddress(uint8_t address) {
+    Wire.beginTransmission(address);
+    return Wire.endTransmission() == 0;
+}
+
+static bool i2cReadReg8(uint8_t address, uint8_t reg, uint8_t& out) {
+    Wire.beginTransmission(address);
+    Wire.write(reg);
+    if (Wire.endTransmission(false) != 0) return false;
+    if (Wire.requestFrom((int)address, 1) != 1) return false;
+    out = Wire.read();
+    return true;
+}
+
+static bool ds3231ReadEpoch(time_t& outEpoch) {
+    if (!i2cDs3231Present) return false;
+
+    Wire.beginTransmission(I2C_ADDR_DS3231);
+    Wire.write((uint8_t)0x00);
+    if (Wire.endTransmission(false) != 0) return false;
+    if (Wire.requestFrom((int)I2C_ADDR_DS3231, 7) != 7) return false;
+
+    uint8_t secRaw = Wire.read();
+    uint8_t minRaw = Wire.read();
+    uint8_t hourRaw = Wire.read();
+    Wire.read(); // day of week, ungenutzt
+    uint8_t mdayRaw = Wire.read();
+    uint8_t monRaw = Wire.read();
+    uint8_t yearRaw = Wire.read();
+
+    struct tm t = {};
+    t.tm_sec  = _bcdToDec(secRaw & 0x7F);
+    t.tm_min  = _bcdToDec(minRaw & 0x7F);
+    t.tm_hour = _bcdToDec(hourRaw & 0x3F);
+    t.tm_mday = _bcdToDec(mdayRaw & 0x3F);
+    t.tm_mon  = _bcdToDec(monRaw & 0x1F) - 1;
+    t.tm_year = _bcdToDec(yearRaw) + 100; // 2000..2099
+    t.tm_isdst = -1;
+
+    if (t.tm_year < 124 || t.tm_mon < 0 || t.tm_mon > 11 || t.tm_mday < 1 || t.tm_mday > 31) {
+        return false;
+    }
+    outEpoch = mktime(&t);
+    return outEpoch > 1700000000L;
+}
+
+static bool ds3231WriteEpoch(time_t epoch) {
+    if (!i2cDs3231Present) return false;
+    struct tm t;
+    localtime_r(&epoch, &t);
+
+    uint8_t dow = (uint8_t)(t.tm_wday == 0 ? 7 : t.tm_wday); // DS3231: 1..7
+    uint8_t buf[8] = {
+        0x00,
+        _decToBcd((uint8_t)t.tm_sec),
+        _decToBcd((uint8_t)t.tm_min),
+        _decToBcd((uint8_t)t.tm_hour),
+        _decToBcd(dow),
+        _decToBcd((uint8_t)t.tm_mday),
+        _decToBcd((uint8_t)(t.tm_mon + 1)),
+        _decToBcd((uint8_t)(t.tm_year % 100))
+    };
+    Wire.beginTransmission(I2C_ADDR_DS3231);
+    Wire.write(buf, sizeof(buf));
+    if (Wire.endTransmission(true) != 0) return false;
+    lastRtcWriteMs = millis();
+    return true;
+}
+
+bool rtcGetEpoch(time_t& outEpoch) {
+    return ds3231ReadEpoch(outEpoch);
+}
+
+bool rtcSetEpoch(time_t epoch) {
+    if (!ds3231WriteEpoch(epoch)) return false;
+    return applySystemTimeEpoch(epoch, false, "DS3231 aktiv", "RTC manuell gesetzt");
+}
+
+static bool applySystemTimeEpoch(time_t epoch, bool writeRtc, const String& source, const String& detail) {
+    if (writeRtc && !ds3231WriteEpoch(epoch)) return false;
+    struct timeval tv = { .tv_sec = epoch, .tv_usec = 0 };
+    settimeofday(&tv, nullptr);
+    rtcTimeValid = true;
+    rtcSetSource(source, detail);
+    return true;
+}
+
+static bool rtcRefreshSystemTime(bool force = false) {
+    if (!i2cDs3231Present) return false;
+    uint32_t nowMs = millis();
+    if (!force && (nowMs - lastRtcReadMs) < 1000UL) return rtcTimeValid;
+
+    time_t rtcEpoch = 0;
+    if (!ds3231ReadEpoch(rtcEpoch)) {
+        rtcTimeValid = false;
+        rtcSetSource("keine", "DS3231 Zeit ungueltig");
+        return false;
+    }
+
+    struct timeval tv = { .tv_sec = rtcEpoch, .tv_usec = 0 };
+    settimeofday(&tv, nullptr);
+    rtcTimeValid = true;
+    rtcSetSource("DS3231 aktiv", "RTC ist Zeitquelle");
+    lastRtcReadMs = nowMs;
+    return true;
+}
+
+static String i2cScanSummary() {
+    String list;
+    for (uint8_t addr = 0x03; addr <= 0x77; addr++) {
+        if (!i2cProbeAddress(addr)) continue;
+        char buf[7];
+        snprintf(buf, sizeof(buf), "0x%02X", addr);
+        if (!list.isEmpty()) list += " ";
+        list += buf;
+    }
+    return list.isEmpty() ? "-" : list;
+}
+
+static void detectI2cDevices() {
+    bool hasDs3231 = i2cProbeAddress(I2C_ADDR_DS3231);
+    bool hasVEML7700 = i2cProbeAddress(I2C_ADDR_VEML7700);
+    i2cBme680Address = -1;
+    i2cBme680ChipId = -1;
+
+    bool bme76 = i2cProbeAddress(I2C_ADDR_BME680_0);
+    bool bme77 = i2cProbeAddress(I2C_ADDR_BME680_1);
+    bool hasBme680 = bme76 || bme77;
+    if (bme76) i2cBme680Address = I2C_ADDR_BME680_0;
+    else if (bme77) i2cBme680Address = I2C_ADDR_BME680_1;
+
+    if (i2cBme680Address >= 0) {
+        uint8_t chipId = 0;
+        if (i2cReadReg8((uint8_t)i2cBme680Address, 0xD0, chipId)) {
+            i2cBme680ChipId = chipId;
+            // 0x61 = BME680/BME688
+            if (chipId != 0x61) hasBme680 = false;
+        } else {
+            hasBme680 = false;
+        }
+    }
+
+    i2cBusScanSummary = i2cScanSummary();
+    i2cDs3231Present = hasDs3231;
+    i2cVEML7700Present = hasVEML7700;
+    i2cBme680Present = hasBme680;
+
+    Serial.printf("[I2C] DS3231 (0x%02X): %s\n", I2C_ADDR_DS3231, hasDs3231 ? "OK" : "nicht gefunden");
+    Serial.printf("[I2C] VEML7700 (0x%02X): %s\n", I2C_ADDR_VEML7700, hasVEML7700 ? "OK" : "nicht gefunden");
+    Serial.printf("[I2C] BME680 (0x%02X/0x%02X): %s\n",
+                  I2C_ADDR_BME680_0,
+                  I2C_ADDR_BME680_1,
+                  hasBme680 ? "OK" : "nicht gefunden");
+    if (i2cBme680Address >= 0) {
+        Serial.printf("[I2C] BME680 addr=0x%02X chip_id=0x%02X\n",
+                      i2cBme680Address,
+                      (i2cBme680ChipId < 0 ? 0 : i2cBme680ChipId));
+    } else {
+        Serial.println("[I2C] BME680 addr=-- chip_id=--");
+    }
+    Serial.printf("[I2C] Scan: %s\n", i2cBusScanSummary.c_str());
+    if (!hasDs3231 || !hasVEML7700 || !hasBme680) {
+        lastStatusMsg = "I2C Geraet fehlt";
+        i2cStatusSummary = String("DS3231:")
+                        + (hasDs3231 ? "OK" : "fehlt")
+                        + " VEML7700:"
+                        + (hasVEML7700 ? "OK" : "fehlt")
+                        + " BME680:"
+                        + (hasBme680 ? "OK" : "fehlt");
+    } else {
+        i2cStatusSummary = "DS3231:OK VEML7700:OK BME680:OK";
+    }
+    if (!i2cDs3231Present) {
+        rtcTimeValid = false;
+        rtcSetSource("keine", "DS3231 nicht gefunden");
+    }
 }
 
 static void startWeatherFetchAsync(uint32_t nowMs) {
@@ -271,6 +482,16 @@ static void ntpSync() {
         Serial.print(".");
     }
     Serial.println(" OK");
+    time_t now = time(nullptr);
+    if (i2cDs3231Present) {
+        if (applySystemTimeEpoch(now, true, "DS3231 aktiv", "RTC von NTP korrigiert")) {
+            rtcTimeValid = true;
+        } else {
+            rtcSetSource("keine", "RTC konnte nicht geschrieben werden");
+        }
+    } else {
+        rtcSetSource("NTP aktiv", "keine RTC");
+    }
     ntpSynced    = true;
     lastNtpSync  = millis();
 }
@@ -302,8 +523,24 @@ void setup() {
     if (!LittleFS.begin(true)) {
         Serial.println("[FS] LittleFS-Fehler!");
     } else {
-        configLoad();
-        Serial.println("[FS] Config geladen.");
+        if (configLoad()) {
+            configSanitize();
+            configSave();
+            Serial.println("[FS] Config geladen.");
+        } else {
+            cfg = Config();
+            configSanitize();
+            if (configSave()) Serial.println("[FS] Keine gueltige Config gefunden, Defaults gespeichert.");
+            else Serial.println("[FS] Keine gueltige Config gefunden, Defaults konnten nicht gespeichert werden.");
+        }
+    }
+
+    pinMode(PIN_FACTORY_RESET, INPUT_PULLUP);
+    Wire.begin(I2C_PIN_SDA, I2C_PIN_SCL);
+    Wire.setClock(100000);
+    detectI2cDevices();
+    if (i2cDs3231Present) {
+        rtcRefreshSystemTime(true);
     }
 
     // Display mit Double-Buffering
@@ -367,6 +604,21 @@ void setup() {
 // ============================================================
 void loop() {
     watchdogSetPhase("loop");
+    bool resetPressed = (digitalRead(PIN_FACTORY_RESET) == LOW);
+    if (resetPressed) {
+        if (factoryResetPressStartMs == 0) factoryResetPressStartMs = millis();
+        if (!factoryResetHandled && (millis() - factoryResetPressStartMs >= FACTORY_RESET_HOLD_MS)) {
+            factoryResetHandled = true;
+            Serial.println("[FactoryReset] Taste gehalten -> Konfiguration wird zurueckgesetzt");
+            configReset();
+            displayShowMessage("Factory Reset...", C_WARN);
+            factoryResetPending = true;
+        }
+    } else {
+        factoryResetPressStartMs = 0;
+        factoryResetHandled = false;
+    }
+
     // Neustart sicher aus dem Haupt-Loop (nicht aus AsyncWebServer-Callback)
     if (factoryResetPending || restartPending) {
         watchdogSetPhase("restart");
@@ -423,9 +675,18 @@ void loop() {
 
     // Aktuelle Zeit holen
     struct tm t;
-    bool timeOk = getLocalTime(&t, 10);
+    bool timeOk = false;
+    if (i2cDs3231Present) {
+        rtcRefreshSystemTime();
+        time_t nowEpoch = time(nullptr);
+        localtime_r(&nowEpoch, &t);
+        timeOk = rtcTimeValid;
+    } else {
+        timeOk = getLocalTime(&t, 10);
+    }
 
-    if (!timeOk || !ntpSynced) {
+    bool hasUsableTime = timeOk && (i2cDs3231Present ? rtcTimeValid : ntpSynced);
+    if (!hasUsableTime) {
         watchdogSetPhase("ntp-wait");
         if (lastStatusMsg != "NTP sync..") {
             lastStatusMsg = "NTP sync..";

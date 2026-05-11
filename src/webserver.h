@@ -23,6 +23,7 @@ bool            restartPending = false;
 bool            factoryResetPending = false;
 static bool     webUpdateOk   = false;
 static String   webUpdateError = "";
+static constexpr uint16_t OTA_PORT = 3232;
 
 // Externe Variablen (definiert in main.cpp / display.h)
 extern bool     ntpSynced;
@@ -33,6 +34,20 @@ extern char     rtcLastWatchdog[160];
 extern char     rtcLastWatchdogPhase[32];
 extern uint32_t rtcLastWatchdogAgeMs;
 extern uint32_t rtcLastWatchdogEpoch;
+extern bool     i2cDs3231Present;
+extern bool     i2cVEML7700Present;
+extern bool     i2cBme680Present;
+extern String   i2cStatusSummary;
+extern String   i2cBusScanSummary;
+extern int      i2cBme680Address;
+extern int      i2cBme680ChipId;
+extern bool     rtcTimeValid;
+extern String   rtcTimeSource;
+extern String   rtcTimeSourceDetail;
+extern uint32_t lastRtcReadMs;
+extern uint32_t lastRtcWriteMs;
+bool rtcGetEpoch(time_t& outEpoch);
+bool rtcSetEpoch(time_t epoch);
 
 // Forward-Deklarationen (definiert in display.h)
 void displayShowOTA(uint32_t progress, uint32_t total);
@@ -126,6 +141,7 @@ input[type=checkbox]{width:auto;margin-right:6px}
   <div class="tab" onclick="show('wifi',this)">WLAN</div>
   <div class="tab" onclick="show('ntp',this)">NTP</div>
   <div class="tab" onclick="show('weather',this)">Wetter</div>
+  <div class="tab" onclick="show('rtc',this)">RTC</div>
   <div class="tab" onclick="show('display',this)">Anzeige</div>
   <div class="tab" onclick="show('ota',this)">OTA</div>
 </div>
@@ -139,6 +155,16 @@ input[type=checkbox]{width:auto;margin-right:6px}
     <button class="btn btn-info" onclick="if(confirm('Neustart?'))fetch('/api/restart').then(()=>{showMsg('Neustart...',true);setTimeout(()=>location.reload(),6000)})">Neustart</button>
     <button class="btn btn-danger" onclick="if(confirm('Factory Reset — alle Einstellungen löschen?'))fetch('/api/reset').then(()=>{showMsg('Reset...',true);setTimeout(()=>location.reload(),4000)})">Factory Reset</button>
   </div>
+</div>
+
+<!-- RTC -->
+<div id="p-rtc" class="panel">
+  <p style="font-size:.85em;color:#aaa">DS3231 ist Laufzeit-Zeitquelle; NTP korrigiert die RTC.</p>
+  <div class="row">
+    <label>Datum <input id="rtc_date" type="date"></label>
+    <label>Zeit <input id="rtc_time" type="time" step="1"></label>
+  </div>
+  <button class="btn btn-save" onclick="rtcSetNow()">RTC setzen</button>
 </div>
 
 <!-- WLAN -->
@@ -283,7 +309,7 @@ input[type=checkbox]{width:auto;margin-right:6px}
   </label>
   <button class="btn btn-info" onclick="uploadFirmware()">Firmware jetzt einspielen</button>
   <p id="otaUploadStatus" style="margin-top:8px;font-size:.85em;color:#aaa"></p>
-  <p style="margin-top:10px;font-size:.8em;color:#888">OTA-Hostname: hub75clock.local &nbsp;|&nbsp; Port: 8266</p>
+  <p style="margin-top:10px;font-size:.8em;color:#888">OTA-Hostname: hub75clock.local &nbsp;|&nbsp; Port: 3232</p>
 </div>
 
 <div id="msg"></div>
@@ -334,6 +360,19 @@ function showMsg(text,ok){
   setTimeout(()=>m.style.display='none',4000);
 }
 
+async function rtcSetNow(){
+  const dateEl=document.getElementById('rtc_date');
+  const timeEl=document.getElementById('rtc_time');
+  const dateVal=(dateEl&&dateEl.value)||'';
+  const timeVal=(timeEl&&timeEl.value)||'';
+  if(!dateVal||!timeVal){showMsg('Bitte Datum und Zeit setzen',false);return;}
+  const body=JSON.stringify({date:dateVal,time:timeVal});
+  const r=await fetch('/api/rtcset',{method:'POST',headers:{'Content-Type':'application/json'},body});
+  const j=await r.json();
+  showMsg(j.ok?'RTC gesetzt':'Fehler: '+(j.error||'?'),!!j.ok);
+  if(j.ok)loadStatus();
+}
+
 function fmtSec(s){
   if(s<0)return'jetzt';
   if(s<60)return s+'s';
@@ -365,6 +404,10 @@ async function loadConfig(){
     if(el.type==='checkbox')el.checked=!!d[f];
     else if(el.tagName==='SELECT')el.value=String(d[f]??'');
     else el.value=d[f]??'';
+    if(secretFields.has(f)){
+      const configured=!!d[f+'_configured'];
+      el.placeholder=configured?'(gespeichert)':'';
+    }
   });
   toggleCoords();
 }
@@ -376,6 +419,7 @@ async function save(){
     if(el.type==='checkbox')d[f]=el.checked;
     else if(el.type==='number')d[f]=parseFloat(el.value)||0;
     else if(el.tagName==='SELECT'&&numSelects.has(f))d[f]=parseInt(el.value,10)||0;
+    else if(f==='ota_password')d[f]=el.value;
     else if(secretFields.has(f)&&el.value==='')return;
     else d[f]=el.value;
   });
@@ -406,10 +450,25 @@ async function loadStatus(){
       ['Watchdog-Phase',d.watchdog_phase||'-'],
       ['Watchdog-Zeit',fmtSec(Math.floor((d.watchdog_age_ms||0)/1000))],
       ['Boot-Grund',d.boot_reason||'-'],
+      ['OTA aktiviert',d.ota_enabled?'Ja':'Nein'],
+      ['OTA-Passwort',d.ota_password_set?'gesetzt':'leer'],
+      ['Zeitquelle',d.time_source||'-'],
+      ['Zeitquelle Detail',d.time_source_detail||'-'],
+      ['RTC gültig',d.rtc_valid?'Ja':'Nein'],
+      ['RTC gelesen vor',fmtSec(Math.floor((d.rtc_read_age_ms||0)/1000))],
+      ['RTC geschrieben vor',fmtSec(Math.floor((d.rtc_write_age_ms||0)/1000))],
+      ['RTC Zeit',d.rtc_time||'-'],
       ['NTP-Status',d.ntp_status||'-'],
       ['Aktiver NTP-Server',d.ntp_active||'-'],
       ['NTP-Server',d.ntp_servers||'-'],
       ['Nächster NTP-Sync',fmtSec(d.next_ntp_sec||0)],
+      ['I2C-Status',d.i2c_status||'-'],
+      ['I2C-Scan',d.i2c_scan||'-'],
+      ['DS3231',d.i2c_ds3231||'-'],
+      ['VEML7700',d.i2c_veml7700||'-'],
+      ['BME680',d.i2c_bme680||'-'],
+      ['BME680-Adresse',d.i2c_bme680_addr||'-'],
+      ['BME680-Chip-ID',d.i2c_bme680_chipid||'-'],
       ['Wetter-Standort',d.weather_loc||'-'],
       ['Wetter',d.weather_status||'-'],
       ['Nächstes Wetter',fmtSec(d.next_weather_sec||0)],
@@ -646,8 +705,7 @@ void webServerSetup() {
             cfg.display_panel_map  = _clampU8(doc["display_panel_map"]  | cfg.display_panel_map,  0, 1);
             cfg.ota_enabled        = doc["ota_enabled"]        | cfg.ota_enabled;
             if (_jsonHasString(doc, "ota_password")) {
-                String newOtaPassword = _jsonString(doc, "ota_password");
-                if (!newOtaPassword.isEmpty()) cfg.ota_password = newOtaPassword;
+                cfg.ota_password = _jsonString(doc, "ota_password");
             }
             cfg.color_digit      = doc["color_digit"]      | cfg.color_digit.c_str();
             cfg.color_date       = doc["color_date"]       | cfg.color_date.c_str();
@@ -657,6 +715,7 @@ void webServerSetup() {
             cfg.color_sec        = doc["color_sec"]        | cfg.color_sec.c_str();
             cfg.color_sec5       = doc["color_sec5"]       | cfg.color_sec5.c_str();
             cfg.color_sec10      = doc["color_sec10"]      | cfg.color_sec10.c_str();
+            configSanitizeColors();
 
             displaySetBrightness(cfg.brightness);
             colorsInit();
@@ -714,11 +773,26 @@ void webServerSetup() {
         doc["boot_reason"] = resetReasonName(esp_reset_reason());
         doc["watchdog_phase"] = rtcLastWatchdogPhase[0] ? rtcLastWatchdogPhase : "-";
         doc["watchdog_age_ms"] = rtcLastWatchdogAgeMs;
+        doc["ota_enabled"] = cfg.ota_enabled;
+        doc["ota_password_set"] = !cfg.ota_password.isEmpty();
+        doc["time_source"] = rtcTimeSource;
+        doc["time_source_detail"] = rtcTimeSourceDetail;
+        doc["rtc_valid"] = rtcTimeValid;
+        doc["rtc_read_age_ms"] = lastRtcReadMs ? (nowMs - lastRtcReadMs) : 0;
+        doc["rtc_write_age_ms"] = lastRtcWriteMs ? (nowMs - lastRtcWriteMs) : 0;
 
         time_t now = time(nullptr);
         char tbuf[24];
         strftime(tbuf, sizeof(tbuf), "%d.%m.%Y %H:%M:%S", localtime(&now));
         doc["time"] = tbuf;
+        time_t rtcEpoch = 0;
+        if (rtcGetEpoch(rtcEpoch)) {
+            char rtcTimeBuf[24];
+            strftime(rtcTimeBuf, sizeof(rtcTimeBuf), "%d.%m.%Y %H:%M:%S", localtime(&rtcEpoch));
+            doc["rtc_time"] = rtcTimeBuf;
+        } else {
+            doc["rtc_time"] = "-";
+        }
 
         doc["ntp_status"]  = ntpSynced ? "Synchronisiert" : "Nicht synchronisiert";
         doc["ntp_servers"] = cfg.ntp1 + " / " + cfg.ntp2 + " / " + cfg.ntp3;
@@ -738,6 +812,25 @@ void webServerSetup() {
         long ntpIntervalMs = (long)cfg.ntp_interval_min * 60000L;
         long nextNtpMs     = ntpIntervalMs - (long)(nowMs - lastNtpSync);
         doc["next_ntp_sec"] = (int)(nextNtpMs / 1000);
+        doc["i2c_status"] = i2cStatusSummary;
+        doc["i2c_scan"] = i2cBusScanSummary;
+        doc["i2c_ds3231"] = i2cDs3231Present ? "OK" : "fehlt";
+        doc["i2c_veml7700"] = i2cVEML7700Present ? "OK" : "fehlt";
+        doc["i2c_bme680"] = i2cBme680Present ? "OK" : "fehlt";
+        if (i2cBme680Address >= 0) {
+            char addrBuf[8];
+            snprintf(addrBuf, sizeof(addrBuf), "0x%02X", i2cBme680Address);
+            doc["i2c_bme680_addr"] = addrBuf;
+        } else {
+            doc["i2c_bme680_addr"] = "--";
+        }
+        if (i2cBme680ChipId >= 0) {
+            char idBuf[8];
+            snprintf(idBuf, sizeof(idBuf), "0x%02X", i2cBme680ChipId);
+            doc["i2c_bme680_chipid"] = idBuf;
+        } else {
+            doc["i2c_bme680_chipid"] = "--";
+        }
 
         // Wetter-Standort (zur Diagnose)
         if (cfg.owm_apikey.isEmpty()) {
@@ -816,6 +909,51 @@ void webServerSetup() {
         req->send(200, "application/json", "{\"ok\":true}");
         restartPending = true;
     });
+
+    // POST /api/rtcset {"date":"YYYY-MM-DD","time":"HH:MM[:SS]"}
+    webServer.on("/api/rtcset", HTTP_POST,
+        [](AsyncWebServerRequest* req) {},
+        nullptr,
+        [](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t, size_t) {
+            if (!_requireWebAuth(req)) return;
+            JsonDocument doc;
+            if (deserializeJson(doc, data, len)) {
+                _sendJsonError(req, 400, "JSON ungueltig");
+                return;
+            }
+            if (!_jsonHasString(doc, "date") || !_jsonHasString(doc, "time")) {
+                _sendJsonError(req, 400, "date/time fehlen");
+                return;
+            }
+            String date = _jsonString(doc, "date");
+            String time = _jsonString(doc, "time");
+            if (date.length() != 10 || time.length() < 5) {
+                _sendJsonError(req, 400, "Ungueltiges Format");
+                return;
+            }
+
+            struct tm t = {};
+            t.tm_year = date.substring(0, 4).toInt() - 1900;
+            t.tm_mon  = date.substring(5, 7).toInt() - 1;
+            t.tm_mday = date.substring(8, 10).toInt();
+            t.tm_hour = time.substring(0, 2).toInt();
+            t.tm_min  = time.substring(3, 5).toInt();
+            t.tm_sec  = (time.length() >= 8) ? time.substring(6, 8).toInt() : 0;
+            t.tm_isdst = -1;
+            time_t epoch = mktime(&t);
+            if (epoch < 1700000000L) {
+                _sendJsonError(req, 400, "Zeit ungueltig");
+                return;
+            }
+            if (!rtcSetEpoch(epoch)) {
+                _sendJsonError(req, 500, "RTC konnte nicht gesetzt werden");
+                return;
+            }
+            ntpSynced = true;
+            lastNtpSync = millis();
+            req->send(200, "application/json", "{\"ok\":true}");
+        }
+    );
 
     // POST /api/update - Firmware-Datei direkt ueber das Webinterface einspielen
     webServer.on("/api/update", HTTP_POST,
@@ -899,6 +1037,7 @@ void webServerSetup() {
 // ============================================================
 void otaSetup() {
     ArduinoOTA.setHostname("hub75clock");
+    ArduinoOTA.setPort(OTA_PORT);
     if (!cfg.ota_password.isEmpty()) {
         ArduinoOTA.setPassword(cfg.ota_password.c_str());
     }
@@ -923,4 +1062,7 @@ void otaSetup() {
         displaySetOtaActive(false);
     });
     ArduinoOTA.begin();
+    Serial.printf("[OTA] Aktiv auf %s:%u\n",
+                  WiFi.localIP().toString().c_str(),
+                  (unsigned)OTA_PORT);
 }

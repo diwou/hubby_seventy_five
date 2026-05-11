@@ -23,7 +23,8 @@ static constexpr int PIN_A   = 10;
 static constexpr int PIN_B   = 11;
 static constexpr int PIN_C   = 12;
 static constexpr int PIN_D   = 13;
-static constexpr int PIN_CLK = 14;
+static constexpr int PIN_E   = 14;
+static constexpr int PIN_CLK = 15;
 static constexpr int PIN_LAT = 17;
 static constexpr int PIN_OE  = 18;
 }
@@ -60,7 +61,7 @@ static void displayPreparePins() {
     const int pins[] = {
         DisplayPins::PIN_R1, DisplayPins::PIN_G1, DisplayPins::PIN_B1,
         DisplayPins::PIN_R2, DisplayPins::PIN_G2, DisplayPins::PIN_B2,
-        DisplayPins::PIN_A,  DisplayPins::PIN_B,  DisplayPins::PIN_C, DisplayPins::PIN_D,
+        DisplayPins::PIN_A,  DisplayPins::PIN_B,  DisplayPins::PIN_C, DisplayPins::PIN_D, DisplayPins::PIN_E,
         DisplayPins::PIN_CLK, DisplayPins::PIN_LAT, DisplayPins::PIN_OE
     };
 
@@ -108,7 +109,7 @@ void displayInit() {
     HUB75_I2S_CFG::i2s_pins pinmap = {
         DisplayPins::PIN_R1, DisplayPins::PIN_G1, DisplayPins::PIN_B1,
         DisplayPins::PIN_R2, DisplayPins::PIN_G2, DisplayPins::PIN_B2,
-        DisplayPins::PIN_A, DisplayPins::PIN_B, DisplayPins::PIN_C, DisplayPins::PIN_D, -1,
+        DisplayPins::PIN_A, DisplayPins::PIN_B, DisplayPins::PIN_C, DisplayPins::PIN_D, DisplayPins::PIN_E,
         DisplayPins::PIN_LAT, DisplayPins::PIN_OE, DisplayPins::PIN_CLK
     };
     // double_buff=false: mit 2 Panels reicht der DMA-Speicher (internes SRAM) nicht fuer double buffering
@@ -557,8 +558,9 @@ static const char* _weekdayFull(int wday) {
     }
 }
 
-// Hilfsfunktion: 2×2-Pixel-Datumspunkt bei (x, y=22)
-static inline void _dateDot(int x) { dma_display->fillRect(x, 18, 2, 2, C_DATE); }
+static inline int _dateBaseY() { return (displayPanelColumns() == 1) ? 15 : 13; }
+// Hilfsfunktion: 2×2-Pixel-Datumspunkt relativ zur Datum-Textzeile
+static inline void _dateDot(int x, int yBase) { dma_display->fillRect(x, yBase + 5, 2, 2, C_DATE); }
 
 static void _drawDate(struct tm* t) {
     char dd[3], mm[3], yy[3], yyyy[5];
@@ -568,6 +570,7 @@ static void _drawDate(struct tm* t) {
     snprintf(yyyy, sizeof(yyyy), "%04d", t->tm_year + 1900);
 
     dma_display->setTextSize(1);
+    int yBase = _dateBaseY();
 
     switch (cfg.date_format) {
 
@@ -575,13 +578,13 @@ static void _drawDate(struct tm* t) {
         // "Mo TT.MM" – Wochentag + Tag.Monat, kein Jahr
         // "Mo"(12) + gap(2) + "TT"(12) + sep(6) + "MM"(12) = 44px → x=11 zentriert
         dma_display->setTextColor(C_WARN);
-        dma_display->setCursor(11, 13);
+        dma_display->setCursor(11, yBase);
         dma_display->print(_weekday(t->tm_wday));   // cursor → 23
         dma_display->setTextColor(C_DATE);
-        dma_display->setCursor(25, 13);             // 2px Abstand
+        dma_display->setCursor(25, yBase);          // 2px Abstand
         dma_display->print(dd);                     // cursor → 37, last glyph x=35
-        _dateDot(38);                               // 2px leer (36,37), Punkt 38-39
-        dma_display->setCursor(42, 13);             // 2px leer (40,41)
+        _dateDot(38, yBase);                        // 2px leer (36,37), Punkt 38-39
+        dma_display->setCursor(42, yBase);          // 2px leer (40,41)
         dma_display->print(mm);                     // last glyph x=52
         break;
     }
@@ -590,13 +593,13 @@ static void _drawDate(struct tm* t) {
         // "TT.MM.JJJJ" – langer Stil ohne Wochentag, zentriert
         // "TT"(12) + sep(6) + "MM"(12) + sep(6) + "JJJJ"(24) = 60px → x=2
         dma_display->setTextColor(C_DATE);
-        dma_display->setCursor(2, 13);
+        dma_display->setCursor(2, yBase);
         dma_display->print(dd);                     // cursor → 14, last glyph 12
-        _dateDot(15);                               // advance gap 13, leer 14, Punkt 15-16
-        dma_display->setCursor(19, 13);             // 2px leer (17,18)
+        _dateDot(15, yBase);                        // advance gap 13, leer 14, Punkt 15-16
+        dma_display->setCursor(19, yBase);          // 2px leer (17,18)
         dma_display->print(mm);                     // cursor → 31, last glyph 29
-        _dateDot(32);                               // advance gap 30, leer 31, Punkt 32-33
-        dma_display->setCursor(36, 13);             // 2px leer (34,35)
+        _dateDot(32, yBase);                        // advance gap 30, leer 31, Punkt 32-33
+        dma_display->setCursor(36, yBase);          // 2px leer (34,35)
         dma_display->print(yyyy);                   // last glyph x=59, cursor 60
         break;
     }
@@ -607,7 +610,7 @@ static void _drawDate(struct tm* t) {
         char buf[9];
         snprintf(buf, sizeof(buf), "%s/%s/%s", mm, dd, yy);
         dma_display->setTextColor(C_DATE);
-        dma_display->setCursor(8, 13);
+        dma_display->setCursor(8, yBase);
         dma_display->print(buf);
         break;
     }
@@ -615,16 +618,16 @@ static void _drawDate(struct tm* t) {
     default: // case 0: "Mo TT.MM.JJ" (Standard)
         // "Mo"(12) + gap(2) + "TT"(12) + sep(6) + "MM"(12) + sep(6) + "JJ"(12) = 62px → x=2
         dma_display->setTextColor(C_WARN);
-        dma_display->setCursor(2, 13);
+        dma_display->setCursor(2, yBase);
         dma_display->print(_weekday(t->tm_wday));   // cursor → 14
         dma_display->setTextColor(C_DATE);
-        dma_display->setCursor(16, 13);             // 2px Abstand
+        dma_display->setCursor(16, yBase);          // 2px Abstand
         dma_display->print(dd);                     // cursor → 28, last glyph 26
-        _dateDot(29);                               // advance gap 27, leer 28, Punkt 29-30
-        dma_display->setCursor(33, 13);             // 2px leer (31,32)
+        _dateDot(29, yBase);                        // advance gap 27, leer 28, Punkt 29-30
+        dma_display->setCursor(33, yBase);          // 2px leer (31,32)
         dma_display->print(mm);                     // cursor → 45, last glyph 43
-        _dateDot(46);                               // advance gap 44, leer 45, Punkt 46-47
-        dma_display->setCursor(50, 13);             // 2px leer (48,49)
+        _dateDot(46, yBase);                        // advance gap 44, leer 45, Punkt 46-47
+        dma_display->setCursor(50, yBase);          // 2px leer (48,49)
         dma_display->print(yy);                     // last glyph 60
         break;
     }
