@@ -8,6 +8,7 @@
 #include <ArduinoOTA.h>
 #include <Update.h>
 #include <LittleFS.h>
+#include <math.h>
 #include "lwip/apps/sntp.h"
 #include "config.h"
 #include "weather.h"
@@ -46,6 +47,15 @@ extern String   rtcTimeSource;
 extern String   rtcTimeSourceDetail;
 extern uint32_t lastRtcReadMs;
 extern uint32_t lastRtcWriteMs;
+extern int      i2cDs3231ProbeCode;
+extern int      i2cVeml7700ProbeCode;
+extern String   i2cRtcDiag;
+extern time_t   lastNtpSyncEpoch;
+extern bool     vemlOk;
+extern String   vemlDiag;
+extern float    luxCurrent;
+extern float    luxFilt;
+extern float    luxHold;
 bool rtcGetEpoch(time_t& outEpoch);
 bool rtcSetEpoch(time_t epoch);
 
@@ -276,6 +286,7 @@ input[type=checkbox]{width:auto;margin-right:6px}
   </label>
   <label>Wetter-Wechselintervall (s) <input id="bottom_cycle_sec" type="number" min="2" max="60"></label>
   <label>Scroll-Geschwindigkeit (ms/Pixel, 30=schnell … 200=langsam) <input id="scroll_speed_ms" type="number" min="30" max="200"></label>
+  <label><input type="checkbox" id="auto_brightness"> Auto-Helligkeit per VEML7700</label>
   <label><input type="checkbox" id="forecast_scroll_up"> Vorhersage-Kacheln von unten einscrollen</label>
   <hr style="border-color:#333;margin:12px 0">
   <p style="font-size:.85em;color:#aaa;margin-bottom:4px">Farben</p>
@@ -318,7 +329,7 @@ input[type=checkbox]{width:auto;margin-right:6px}
 const fields=['sta_ssid','sta_pass','ap_password','web_password','wifi_timeout_sec','ntp1','ntp2','ntp3',
   'ntp_interval_min','tz','owm_apikey','owm_city','owm_lat','owm_lon','owm_use_coords',
   'owm_unit','owm_interval_min','brightness','lang','time_12h','date_format',
-  'anim_mode','seconds_mode','display_panel_cols','bottom_cycle_sec','scroll_speed_ms','forecast_scroll_up',
+  'anim_mode','seconds_mode','display_panel_cols','bottom_cycle_sec','scroll_speed_ms','auto_brightness','forecast_scroll_up',
   'ota_enabled','ota_password',
   'color_digit','color_date','color_temp','color_warn','color_info',
   'color_sec','color_sec5','color_sec10'];
@@ -452,12 +463,16 @@ async function loadStatus(){
       ['Boot-Grund',d.boot_reason||'-'],
       ['OTA aktiviert',d.ota_enabled?'Ja':'Nein'],
       ['OTA-Passwort',d.ota_password_set?'gesetzt':'leer'],
+      ['RTC vorhanden',d.rtc_present?'ja':'nein'],
+      ['RTC gültig',d.rtc_valid?'ja':'nein'],
+      ['I2C',d.i2c_rtc_diag||'-'],
       ['Zeitquelle',d.time_source||'-'],
-      ['Zeitquelle Detail',d.time_source_detail||'-'],
-      ['RTC gültig',d.rtc_valid?'Ja':'Nein'],
+      ['Info',d.time_source_detail||'-'],
+      ['RTC-Datum',d.rtc_date||'-'],
       ['RTC gelesen vor',fmtSec(Math.floor((d.rtc_read_age_ms||0)/1000))],
       ['RTC geschrieben vor',fmtSec(Math.floor((d.rtc_write_age_ms||0)/1000))],
       ['RTC Zeit',d.rtc_time||'-'],
+      ['Letzter NTP-Sync',d.ntp_last_sync||'-'],
       ['NTP-Status',d.ntp_status||'-'],
       ['Aktiver NTP-Server',d.ntp_active||'-'],
       ['NTP-Server',d.ntp_servers||'-'],
@@ -466,6 +481,12 @@ async function loadStatus(){
       ['I2C-Scan',d.i2c_scan||'-'],
       ['DS3231',d.i2c_ds3231||'-'],
       ['VEML7700',d.i2c_veml7700||'-'],
+      ['VEML aktiv',d.veml_ok?'ja':'nein'],
+      ['VEML-Diag',d.veml_diag||'-'],
+      ['Auto-Helligkeit',d.auto_brightness?'an':'aus'],
+      ['Lux aktuell',d.veml_lux_current||'-'],
+      ['Lux gefiltert',d.veml_lux_filt||'-'],
+      ['Lux gehalten',d.veml_lux_hold||'-'],
       ['BME680',d.i2c_bme680||'-'],
       ['BME680-Adresse',d.i2c_bme680_addr||'-'],
       ['BME680-Chip-ID',d.i2c_bme680_chipid||'-'],
@@ -604,6 +625,7 @@ void webServerSetup() {
         doc["owm_unit"]         = cfg.owm_unit;
         doc["owm_interval_min"] = cfg.owm_interval_min;
         doc["brightness"]       = cfg.brightness;
+        doc["auto_brightness"]  = cfg.auto_brightness;
         doc["lang"]             = cfg.lang;
         doc["bottom_cycle_sec"] = cfg.bottom_cycle_sec;
         doc["scroll_speed_ms"]  = cfg.scroll_speed_ms;
@@ -692,6 +714,7 @@ void webServerSetup() {
             uint8_t oldPanelMap  = cfg.display_panel_map;
 
             cfg.brightness       = _clampU8(doc["brightness"] | cfg.brightness, 0, 255);
+            cfg.auto_brightness  = doc["auto_brightness"] | cfg.auto_brightness;
             cfg.lang             = doc["lang"]             | cfg.lang.c_str();
             cfg.bottom_cycle_sec = _clampU8(doc["bottom_cycle_sec"] | cfg.bottom_cycle_sec, 2, 60);
             cfg.scroll_speed_ms  = _clampU8(doc["scroll_speed_ms"] | cfg.scroll_speed_ms, 30, 200);
@@ -775,9 +798,11 @@ void webServerSetup() {
         doc["watchdog_age_ms"] = rtcLastWatchdogAgeMs;
         doc["ota_enabled"] = cfg.ota_enabled;
         doc["ota_password_set"] = !cfg.ota_password.isEmpty();
+        doc["rtc_present"] = i2cDs3231Present;
         doc["time_source"] = rtcTimeSource;
         doc["time_source_detail"] = rtcTimeSourceDetail;
         doc["rtc_valid"] = rtcTimeValid;
+        doc["i2c_rtc_diag"] = i2cRtcDiag;
         doc["rtc_read_age_ms"] = lastRtcReadMs ? (nowMs - lastRtcReadMs) : 0;
         doc["rtc_write_age_ms"] = lastRtcWriteMs ? (nowMs - lastRtcWriteMs) : 0;
 
@@ -787,11 +812,22 @@ void webServerSetup() {
         doc["time"] = tbuf;
         time_t rtcEpoch = 0;
         if (rtcGetEpoch(rtcEpoch)) {
+            char rtcDateBuf[16];
             char rtcTimeBuf[24];
+            strftime(rtcDateBuf, sizeof(rtcDateBuf), "%d.%m.%Y", localtime(&rtcEpoch));
             strftime(rtcTimeBuf, sizeof(rtcTimeBuf), "%d.%m.%Y %H:%M:%S", localtime(&rtcEpoch));
+            doc["rtc_date"] = rtcDateBuf;
             doc["rtc_time"] = rtcTimeBuf;
         } else {
+            doc["rtc_date"] = "-";
             doc["rtc_time"] = "-";
+        }
+        if (lastNtpSyncEpoch > 0) {
+            char ntpBuf[24];
+            strftime(ntpBuf, sizeof(ntpBuf), "%d.%m.%Y %H:%M:%S", localtime(&lastNtpSyncEpoch));
+            doc["ntp_last_sync"] = ntpBuf;
+        } else {
+            doc["ntp_last_sync"] = "-";
         }
 
         doc["ntp_status"]  = ntpSynced ? "Synchronisiert" : "Nicht synchronisiert";
@@ -816,6 +852,15 @@ void webServerSetup() {
         doc["i2c_scan"] = i2cBusScanSummary;
         doc["i2c_ds3231"] = i2cDs3231Present ? "OK" : "fehlt";
         doc["i2c_veml7700"] = i2cVEML7700Present ? "OK" : "fehlt";
+        doc["veml_ok"] = vemlOk;
+        doc["veml_diag"] = vemlDiag;
+        doc["auto_brightness"] = cfg.auto_brightness;
+        if (isfinite(luxCurrent)) doc["veml_lux_current"] = String(luxCurrent, 1);
+        else doc["veml_lux_current"] = "--";
+        if (isfinite(luxFilt)) doc["veml_lux_filt"] = String(luxFilt, 1);
+        else doc["veml_lux_filt"] = "--";
+        if (isfinite(luxHold)) doc["veml_lux_hold"] = String(luxHold, 1);
+        else doc["veml_lux_hold"] = "--";
         doc["i2c_bme680"] = i2cBme680Present ? "OK" : "fehlt";
         if (i2cBme680Address >= 0) {
             char addrBuf[8];

@@ -50,6 +50,7 @@ struct Config {
 
     // Anzeige
     uint8_t brightness        = 90;      // 0-255
+    bool    auto_brightness   = false;   // Helligkeit per VEML7700 regeln
     String  lang              = "de";    // "de" oder "en"
     uint8_t bottom_cycle_sec  = 6;       // Wechselintervall untere Zeile (s)
     uint8_t scroll_speed_ms   = 40;      // Scroll-Geschwindigkeit (ms/Pixel, 30-200)
@@ -171,6 +172,7 @@ bool configLoad() {
     cfg.owm_unit          = doc["owm_unit"]          | 0;
     cfg.owm_interval_min  = doc["owm_interval_min"]  | 30;
     cfg.brightness        = doc["brightness"]        | 90;
+    cfg.auto_brightness   = doc["auto_brightness"]   | false;
     cfg.lang              = doc["lang"]              | "de";
     cfg.bottom_cycle_sec  = doc["bottom_cycle_sec"]  | 6;
     cfg.scroll_speed_ms   = doc["scroll_speed_ms"]   | 40;
@@ -226,6 +228,7 @@ bool configSave() {
     doc["owm_unit"]         = cfg.owm_unit;
     doc["owm_interval_min"] = cfg.owm_interval_min;
     doc["brightness"]       = cfg.brightness;
+    doc["auto_brightness"]  = cfg.auto_brightness;
     doc["lang"]             = cfg.lang;
     doc["bottom_cycle_sec"] = cfg.bottom_cycle_sec;
     doc["scroll_speed_ms"]  = cfg.scroll_speed_ms;

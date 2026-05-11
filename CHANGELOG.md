@@ -11,6 +11,8 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 ## [UNRELEASED]
 
 ### Fixed
+- Nach der Verschiebung der Datumszeile im 1x-HUB75-Modus wurde der Wetter-Clear-Bereich ebenfalls nach unten angepasst, damit die untere Datumszeile nicht mehr vom Wetter-Redraw geloescht wird. [pending]
+- Die 1x-HUB75-Vorhersage wurde horizontal verdichtet (2-stellige Wochentage, engere Abstaende um `C` und `/`), damit die komplette Zeile wieder sicher auf ein Einzelpanel passt. [pending]
 - Im 1x-HUB75-Modus wurde die Datumszeile (inkl. Trennpunkte) um 2 Pixel nach unten verschoben, damit bei Einzelpanel die Uhrzeit nicht mehr in den Datumsbereich hineinschreibt. [65932e8]
 - DS3231 als aktive Laufzeit-Zeitquelle integriert: Die Systemzeit wird aus der RTC gefuehrt, NTP korrigiert die RTC, und das Webinterface wurde um RTC-Status sowie einen RTC-Setzen-Endpunkt erweitert. [65932e8]
 - Konfigurations-Bootstrap gehaertet: Wenn `cfg.json` fehlt, unlesbar oder inkonsistent ist, schreibt die Firmware jetzt sofort einen sauberen Default-Stand auf LittleFS. Zusaetzlich werden sensible Textfelder beim Laden normalisiert, damit keine kaputten Erstwerte im Laufzeit- oder Speicherzustand bleiben. [65932e8]
@@ -18,6 +20,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 - OTA-Dokumentation im Webinterface wurde korrigiert: Statt des falschen Ports `8266` verwendet die Firmware jetzt explizit `ArduinoOTA` auf Port `3232`, damit Uploads per IP wieder mit den angezeigten Verbindungsdaten funktionieren. [65932e8]
 - Die I2C-Diagnose wurde fuer den BME680 erweitert: Neben dem reinen Address-ACK zeigt die Firmware jetzt zusaetzlich den gefundenen BME680-I2C-Kanal (`0x76`/`0x77`), die gelesene Chip-ID aus Register `0xD0` und einen kompakten Bus-Scan im Status. Damit laesst sich eindeutig unterscheiden, ob der Sensor gar nicht antwortet oder mit unerwarteter ID antwortet. [65932e8]
 - Web-Konfiguration zeigt jetzt fuer geheime Felder (u. a. OpenWeatherMap API-Key) den gespeicherten Zustand klar als Platzhalter an, damit ein korrekt gespeicherter Key nicht wie "verloren" wirkt; zusaetzlich wird der I2C-Geraetestatus (DS3231/VEML7700/BME680) im Status-Tab sichtbar. [65932e8]
+- Das Web-Statusbild wurde auf Dottie-Stand erweitert: zusaetzliche RTC-Statuszeilen sowie VEML7700-Diagnose mit Lux-Werten und Auto-Helligkeit sind jetzt direkt im Status sichtbar; die Option `Auto-Helligkeit per VEML7700` ist im Anzeige-Tab konfigurierbar. [pending]
 - Hardware-Reset und I2C-Basis wurden auf die neue Verdrahtung angepasst: Factory-Reset liegt jetzt auf GPIO3 (Long-Press), der I2C-Bus auf SDA GPIO38 und SCL GPIO39; beim Boot prueft die Firmware jetzt gezielt DS3231 (`0x68`), VEML7700 (`0x10`) und BME680 (`0x76/0x77`) und meldet fehlende Geraete im Status. [65932e8]
 - Die HUB75-Adressleitung `E` ist jetzt als eigener GPIO (`PIN_E = 14`) verdrahtet und wird in der Matrix-Pinmap aktiv angesteuert statt ungenutzt auf `-1`, damit Panels mit genutzter E-Leitung korrekt adressiert werden. [65932e8]
 - Ungueltige oder leere Farbwerte aus der gespeicherten Konfiguration werden jetzt beim Laden und Speichern konsequent auf gueltige `#RRGGBB`-Defaults zurueckgesetzt, damit ein frisch aufgespielter oder migrierter Stand nicht mit schwarzen Farben startet. [65932e8]

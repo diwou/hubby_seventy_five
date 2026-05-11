@@ -11,8 +11,10 @@
 #include <ESPmDNS.h>
 #include <LittleFS.h>
 #include <Wire.h>
+#include <Adafruit_VEML7700.h>
 #include <time.h>
 #include <sys/time.h>
+#include <math.h>
 #include <cstring>
 
 #include "config.h"
@@ -52,9 +54,13 @@ static constexpr uint8_t I2C_ADDR_BME680_1 = 0x77;
 static constexpr uint32_t FACTORY_RESET_HOLD_MS = 4000UL;
 static uint32_t factoryResetPressStartMs = 0;
 static bool factoryResetHandled = false;
+Adafruit_VEML7700 veml;
 bool i2cDs3231Present = false;
 bool i2cVEML7700Present = false;
 bool i2cBme680Present = false;
+int i2cDs3231ProbeCode = -1;
+int i2cVeml7700ProbeCode = -1;
+String i2cRtcDiag = "VEML=- @0x10, DS3231=- @0x68";
 String i2cStatusSummary = "nicht geprueft";
 String i2cBusScanSummary = "-";
 int i2cBme680Address = -1;
@@ -64,10 +70,44 @@ String rtcTimeSource = "keine";
 String rtcTimeSourceDetail = "";
 uint32_t lastRtcReadMs = 0;
 uint32_t lastRtcWriteMs = 0;
+time_t lastNtpSyncEpoch = 0;
+bool vemlOk = false;
+String vemlDiag = "nicht gefunden";
+float luxFilt = NAN;
+float luxHold = NAN;
+float luxCurrent = NAN;
+unsigned long luxWarmupUntilMs = 0;
+unsigned long lastLuxMs = 0;
+unsigned long vemlRetryAtMs = 0;
+uint8_t vemlRetryCount = 0;
+
+static void refreshI2cStatusSummary() {
+    i2cStatusSummary = String("DS3231:")
+                    + (i2cDs3231Present ? "OK" : "fehlt")
+                    + " VEML7700:"
+                    + (i2cVEML7700Present ? "OK" : "fehlt")
+                    + " BME680:"
+                    + (i2cBme680Present ? "OK" : "fehlt");
+}
 
 static inline uint8_t _bcdToDec(uint8_t v) { return (uint8_t)(((v >> 4) * 10) + (v & 0x0F)); }
 static inline uint8_t _decToBcd(uint8_t v) { return (uint8_t)((((v / 10) & 0x0F) << 4) | (v % 10)); }
 static bool applySystemTimeEpoch(time_t epoch, bool writeRtc, const String& source, const String& detail = "");
+
+static uint8_t luxToBrightness(float lux) {
+    constexpr float LUX_MIN = 0.2f;
+    constexpr float LUX_MAX = 235.0f;
+    constexpr float GAMMA_C = 0.65f;
+    if (!isfinite(lux)) return cfg.brightness;
+    if (lux < LUX_MIN) lux = LUX_MIN;
+    if (lux > LUX_MAX) lux = LUX_MAX;
+    float x = (lux - LUX_MIN) / (LUX_MAX - LUX_MIN);
+    float y = powf(x, GAMMA_C);
+    int out = (int)lroundf(y * 255.0f);
+    if (out < 8) out = 8;
+    if (out > 255) out = 255;
+    return (uint8_t)out;
+}
 
 static void rtcSetSource(const String& source, const String& detail = "") {
     rtcTimeSource = source;
@@ -161,6 +201,11 @@ static void weatherFetchTask(void*) {
 static bool i2cProbeAddress(uint8_t address) {
     Wire.beginTransmission(address);
     return Wire.endTransmission() == 0;
+}
+
+static int i2cProbeCode(uint8_t address) {
+    Wire.beginTransmission(address);
+    return (int)Wire.endTransmission();
 }
 
 static bool i2cReadReg8(uint8_t address, uint8_t reg, uint8_t& out) {
@@ -278,8 +323,12 @@ static String i2cScanSummary() {
 }
 
 static void detectI2cDevices() {
-    bool hasDs3231 = i2cProbeAddress(I2C_ADDR_DS3231);
-    bool hasVEML7700 = i2cProbeAddress(I2C_ADDR_VEML7700);
+    i2cDs3231ProbeCode = i2cProbeCode(I2C_ADDR_DS3231);
+    i2cVeml7700ProbeCode = i2cProbeCode(I2C_ADDR_VEML7700);
+    bool hasDs3231 = (i2cDs3231ProbeCode == 0);
+    bool hasVEML7700 = (i2cVeml7700ProbeCode == 0);
+    i2cRtcDiag = String("VEML=") + i2cVeml7700ProbeCode
+              + " @0x10, DS3231=" + i2cDs3231ProbeCode + " @0x68";
     i2cBme680Address = -1;
     i2cBme680ChipId = -1;
 
@@ -307,6 +356,7 @@ static void detectI2cDevices() {
 
     Serial.printf("[I2C] DS3231 (0x%02X): %s\n", I2C_ADDR_DS3231, hasDs3231 ? "OK" : "nicht gefunden");
     Serial.printf("[I2C] VEML7700 (0x%02X): %s\n", I2C_ADDR_VEML7700, hasVEML7700 ? "OK" : "nicht gefunden");
+    Serial.printf("[I2C] RTC-Diag: %s\n", i2cRtcDiag.c_str());
     Serial.printf("[I2C] BME680 (0x%02X/0x%02X): %s\n",
                   I2C_ADDR_BME680_0,
                   I2C_ADDR_BME680_1,
@@ -321,12 +371,7 @@ static void detectI2cDevices() {
     Serial.printf("[I2C] Scan: %s\n", i2cBusScanSummary.c_str());
     if (!hasDs3231 || !hasVEML7700 || !hasBme680) {
         lastStatusMsg = "I2C Geraet fehlt";
-        i2cStatusSummary = String("DS3231:")
-                        + (hasDs3231 ? "OK" : "fehlt")
-                        + " VEML7700:"
-                        + (hasVEML7700 ? "OK" : "fehlt")
-                        + " BME680:"
-                        + (hasBme680 ? "OK" : "fehlt");
+        refreshI2cStatusSummary();
     } else {
         i2cStatusSummary = "DS3231:OK VEML7700:OK BME680:OK";
     }
@@ -334,6 +379,89 @@ static void detectI2cDevices() {
         rtcTimeValid = false;
         rtcSetSource("keine", "DS3231 nicht gefunden");
     }
+
+    vemlOk = hasVEML7700 && veml.begin();
+    if (vemlOk) {
+        veml.setGain(VEML7700_GAIN_2);
+        veml.setIntegrationTime(VEML7700_IT_50MS);
+        veml.interruptEnable(false);
+        luxWarmupUntilMs = millis() + 1500;
+        vemlRetryAtMs = 0;
+        vemlRetryCount = 0;
+        vemlDiag = i2cRtcDiag + " | VEML OK";
+    } else {
+        luxWarmupUntilMs = 0;
+        vemlRetryAtMs = millis() + 3000;
+        vemlRetryCount++;
+        vemlDiag = i2cRtcDiag + " | VEML NACK";
+    }
+    refreshI2cStatusSummary();
+}
+
+static void retryLightSensorIfNeeded() {
+    if (vemlOk) return;
+    if (!vemlRetryAtMs) return;
+    if ((long)(millis() - vemlRetryAtMs) < 0) return;
+    if (vemlRetryCount > 10) {
+        vemlRetryAtMs = 0;
+        return;
+    }
+    bool hasVEML7700 = (i2cProbeCode(I2C_ADDR_VEML7700) == 0);
+    i2cVEML7700Present = hasVEML7700;
+    vemlOk = hasVEML7700 && veml.begin();
+    if (vemlOk) {
+        veml.setGain(VEML7700_GAIN_2);
+        veml.setIntegrationTime(VEML7700_IT_50MS);
+        veml.interruptEnable(false);
+        luxWarmupUntilMs = millis() + 1500;
+        vemlRetryAtMs = 0;
+        vemlRetryCount = 0;
+        vemlDiag = i2cRtcDiag + " | VEML OK";
+    } else {
+        vemlRetryAtMs = millis() + 3000;
+        vemlRetryCount++;
+        vemlDiag = i2cRtcDiag + " | VEML NACK";
+    }
+    refreshI2cStatusSummary();
+}
+
+static void updateBrightnessFromLux(bool force = false) {
+    if (!vemlOk || !cfg.auto_brightness) {
+        displaySetBrightness(cfg.brightness);
+        return;
+    }
+    unsigned long now = millis();
+    if (!force && (long)(now - luxWarmupUntilMs) < 0) {
+        displaySetBrightness(cfg.brightness);
+        return;
+    }
+    if (!force && now - lastLuxMs < 250) return;
+    lastLuxMs = now;
+
+    float lux = veml.readLux();
+    if (!isfinite(lux) || lux < 0.0f) {
+        displaySetBrightness(cfg.brightness);
+        return;
+    }
+    luxCurrent = lux;
+
+    if (!isfinite(luxFilt)) luxFilt = lux;
+    else {
+        float a = (lux > luxFilt) ? 0.55f : 0.12f;
+        luxFilt = (1.0f - a) * luxFilt + a * lux;
+    }
+
+    const float FAST_DELTA = 8.0f;
+    if (!isfinite(luxHold)) luxHold = luxFilt;
+    else {
+        float d = luxFilt - luxHold;
+        if (fabsf(d) >= FAST_DELTA) luxHold = luxFilt;
+        else {
+            if (luxFilt > luxHold + 1.2f) luxHold = luxFilt;
+            else if (luxFilt < luxHold - 1.2f) luxHold = luxFilt;
+        }
+    }
+    displaySetBrightness(luxToBrightness(luxHold));
 }
 
 static void startWeatherFetchAsync(uint32_t nowMs) {
@@ -483,6 +611,7 @@ static void ntpSync() {
     }
     Serial.println(" OK");
     time_t now = time(nullptr);
+    lastNtpSyncEpoch = now;
     if (i2cDs3231Present) {
         if (applySystemTimeEpoch(now, true, "DS3231 aktiv", "RTC von NTP korrigiert")) {
             rtcTimeValid = true;
@@ -542,6 +671,7 @@ void setup() {
     if (i2cDs3231Present) {
         rtcRefreshSystemTime(true);
     }
+    updateBrightnessFromLux(true);
 
     // Display mit Double-Buffering
     displayInit();
@@ -595,6 +725,7 @@ void setup() {
     // Werte erhalten → Ghosting nach Software-Neustart.
     displayReset();
     displayRampBrightness(cfg.brightness);
+    updateBrightnessFromLux(true);
 
     Serial.println("[Setup] Fertig.");
 }
@@ -632,6 +763,9 @@ void loop() {
         ArduinoOTA.handle();
     }
     if (otaRunning) return;
+
+    retryLightSensorIfNeeded();
+    updateBrightnessFromLux();
 
     if (weatherFetchDisplayPending && !weatherFetchActive) {
         weatherFetchDisplayPending = false;
