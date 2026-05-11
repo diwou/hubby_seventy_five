@@ -442,7 +442,9 @@ static void detectI2cDevices() {
             bme.setHumidityOversampling(BME68X_OS_2X);
             bme.setPressureOversampling(BME68X_OS_4X);
             bme.setIIRFilterSize(BME68X_FILTER_SIZE_3);
-            bme.setGasHeater(320, 150);
+            // Fuer stabile Umgebungswerte (Temp/Feuchte) den Gas-Heizer deaktivieren,
+            // sonst dominiert Eigenerwaermung der Messzelle.
+            bme.setGasHeater(0, 0);
             bmeDiag = "Init OK";
             updateBme680Readings(true);
         } else {
