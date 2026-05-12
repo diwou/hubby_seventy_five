@@ -146,25 +146,24 @@ static void updateBme680Readings(bool force = false) {
 static inline uint8_t _bcdToDec(uint8_t v) { return (uint8_t)(((v >> 4) * 10) + (v & 0x0F)); }
 static inline uint8_t _decToBcd(uint8_t v) { return (uint8_t)((((v / 10) & 0x0F) << 4) | (v % 10)); }
 
-static int32_t _daysFromCivil(int32_t y, uint32_t m, uint32_t d) {
-    y -= (m <= 2) ? 1 : 0;
-    const int32_t era = (y >= 0 ? y : y - 399) / 400;
-    const uint32_t yoe = (uint32_t)(y - era * 400);
-    const uint32_t doy = (153 * (m + (m > 2 ? (uint32_t)-3 : 9)) + 2) / 5 + d - 1;
-    const uint32_t doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    return era * 146097 + (int32_t)doe - 719468;
+static bool _isLeapYear(int year) {
+    return ((year % 4) == 0 && (year % 100) != 0) || ((year % 400) == 0);
 }
 
-static time_t _epochFromUtcTm(const struct tm& t) {
-    int32_t year = t.tm_year + 1900;
-    uint32_t month = (uint32_t)(t.tm_mon + 1);
-    uint32_t day = (uint32_t)t.tm_mday;
-    int32_t days = _daysFromCivil(year, month, day);
-    int64_t sec = (int64_t)days * 86400LL
-                + (int64_t)t.tm_hour * 3600LL
-                + (int64_t)t.tm_min * 60LL
-                + (int64_t)t.tm_sec;
-    return (time_t)sec;
+static int _daysInMonth(int year, int month) {
+    static const int days[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+    if (month < 1 || month > 12) return 0;
+    if (month == 2) return days[1] + (_isLeapYear(year) ? 1 : 0);
+    return days[month - 1];
+}
+
+static int64_t _daysFromCivilUTC(int year, unsigned month, unsigned day) {
+    year -= month <= 2;
+    const int era = (year >= 0 ? year : year - 399) / 400;
+    const unsigned yoe = (unsigned)(year - era * 400);
+    const unsigned doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+    const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    return (int64_t)era * 146097 + (int64_t)doe - 719468;
 }
 static bool applySystemTimeEpoch(time_t epoch, bool writeRtc, const String& source, const String& detail = "");
 
@@ -307,28 +306,31 @@ static bool ds3231ReadEpoch(time_t& outEpoch) {
     uint8_t monRaw = Wire.read();
     uint8_t yearRaw = Wire.read();
 
-    struct tm t = {};
-    t.tm_sec  = _bcdToDec(secRaw & 0x7F);
-    t.tm_min  = _bcdToDec(minRaw & 0x7F);
+    int sec = _bcdToDec(secRaw & 0x7F);
+    int min = _bcdToDec(minRaw & 0x7F);
+    int hour = 0;
     if (hourRaw & 0x40) {
-        // 12h-Modus: Bit5 = PM, Bit4..0 = Stunde (1..12)
         uint8_t hour12 = _bcdToDec(hourRaw & 0x1F);
         bool isPm = (hourRaw & 0x20) != 0;
         if (hour12 < 1 || hour12 > 12) return false;
-        uint8_t hour24 = hour12 % 12;
+        uint8_t hour24 = (uint8_t)(hour12 % 12);
         if (isPm) hour24 += 12;
-        t.tm_hour = hour24;
+        hour = hour24;
     } else {
-        // 24h-Modus: Bit5..0 = Stunde (00..23)
-        t.tm_hour = _bcdToDec(hourRaw & 0x3F);
+        hour = _bcdToDec(hourRaw & 0x3F);
     }
-    t.tm_mday = _bcdToDec(mdayRaw & 0x3F);
-    t.tm_mon  = _bcdToDec(monRaw & 0x1F) - 1;
-    t.tm_year = _bcdToDec(yearRaw) + 100; // 2000..2099
-    if (t.tm_year < 124 || t.tm_mon < 0 || t.tm_mon > 11 || t.tm_mday < 1 || t.tm_mday > 31) {
-        return false;
-    }
-    outEpoch = _epochFromUtcTm(t);
+    int day = _bcdToDec(mdayRaw & 0x3F);
+    int month = _bcdToDec(monRaw & 0x1F);
+    int year = 2000 + _bcdToDec(yearRaw);
+    if (monRaw & 0x80) year += 100;
+
+    if (sec < 0 || sec > 59 || min < 0 || min > 59 || hour < 0 || hour > 23) return false;
+    if (month < 1 || month > 12) return false;
+    if (day < 1 || day > _daysInMonth(year, month)) return false;
+    if (year < 2000 || year > 2199) return false;
+
+    outEpoch = (time_t)(_daysFromCivilUTC(year, (unsigned)month, (unsigned)day) * 86400LL
+            + (int64_t)hour * 3600LL + (int64_t)min * 60LL + (int64_t)sec);
     return outEpoch > 1700000000L;
 }
 
@@ -930,25 +932,18 @@ void loop() {
         return;
     }
 
-    // Aktuelle Zeit holen:
-    // - Mit WLAN/NTP: direkte Systemzeit (NTP-geführt)
-    // - Ohne NTP: DS3231 als Fallback
+    // Aktuelle Zeit holen
     struct tm t;
     bool timeOk = false;
-    bool hasUsableTime = false;
-    if (wifiConnected && ntpSynced) {
-        timeOk = getLocalTime(&t, 10);
-        hasUsableTime = timeOk;
-    } else if (i2cDs3231Present) {
+    if (i2cDs3231Present) {
         rtcRefreshSystemTime();
         time_t nowEpoch = time(nullptr);
         localtime_r(&nowEpoch, &t);
         timeOk = rtcTimeValid;
-        hasUsableTime = timeOk && rtcTimeValid;
     } else {
         timeOk = getLocalTime(&t, 10);
-        hasUsableTime = timeOk && ntpSynced;
     }
+    bool hasUsableTime = timeOk && (i2cDs3231Present ? rtcTimeValid : ntpSynced);
     if (!hasUsableTime) {
         watchdogSetPhase("ntp-wait");
         if (lastStatusMsg != "NTP sync..") {
