@@ -139,6 +139,11 @@ static inline void configSanitize() {
     _sanitizeTextField(cfg.ota_password, 32);
 
     if (cfg.lang != "de" && cfg.lang != "en") cfg.lang = "de";
+    if (cfg.tz.isEmpty()) cfg.tz = "CET-1CEST,M3.5.0,M10.5.0/3";
+    if (cfg.ntp_interval_min < 5) cfg.ntp_interval_min = 5;
+    if (cfg.ntp_interval_min > 1440) cfg.ntp_interval_min = 1440;
+    if (cfg.owm_interval_min < 10) cfg.owm_interval_min = 10;
+    if (cfg.owm_interval_min > 1440) cfg.owm_interval_min = 1440;
     if (!cfg.ap_password.isEmpty() && cfg.ap_password.length() < 8) cfg.ap_password = "";
     if (cfg.web_password.length() < 8) cfg.web_password = DEFAULT_WEB_PASSWORD;
     configSanitizeColors();

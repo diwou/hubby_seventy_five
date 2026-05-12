@@ -92,6 +92,35 @@ static uint16_t _clampU16(uint32_t value, uint16_t minVal, uint16_t maxVal) {
     return (uint16_t)value;
 }
 
+static uint16_t _jsonU16Or(JsonDocument& doc, const char* key, uint16_t fallback) {
+    JsonVariantConst v = doc[key];
+    if (v.isNull()) return fallback;
+    if (v.is<uint16_t>()) return v.as<uint16_t>();
+    if (v.is<int>()) {
+        int n = v.as<int>();
+        if (n < 0) return 0;
+        return (uint16_t)n;
+    }
+    if (v.is<float>()) {
+        float f = v.as<float>();
+        if (!isfinite(f) || f < 0.0f) return 0;
+        return (uint16_t)lroundf(f);
+    }
+    if (v.is<const char*>()) {
+        String s = v.as<String>();
+        s.trim();
+        if (s.isEmpty()) return fallback;
+        for (size_t i = 0; i < s.length(); i++) {
+            if (!isDigit(s[i])) return fallback;
+        }
+        long n = s.toInt();
+        if (n < 0) return 0;
+        if (n > 65535L) return 65535U;
+        return (uint16_t)n;
+    }
+    return fallback;
+}
+
 static bool _webAuthOk(AsyncWebServerRequest* req) {
     return req->authenticate("admin", cfg.web_password.c_str(), "HUB75 Clock", false);
 }
@@ -444,7 +473,12 @@ async function save(){
   fields.forEach(f=>{
     const el=document.getElementById(f);if(!el)return;
     if(el.type==='checkbox')d[f]=el.checked;
-    else if(el.type==='number')d[f]=parseFloat(el.value)||0;
+    else if(el.type==='number'){
+      const v=el.value.trim();
+      if(v==='')return;
+      const n=Number(v);
+      if(Number.isFinite(n))d[f]=Math.round(n);
+    }
     else if(el.tagName==='SELECT'&&numSelects.has(f))d[f]=parseInt(el.value,10)||0;
     else if(f==='ota_password')d[f]=el.value;
     else if(secretFields.has(f)&&el.value==='')return;
@@ -729,11 +763,11 @@ void webServerSetup() {
                 String newWebPassword = _jsonString(doc, "web_password");
                 if (!newWebPassword.isEmpty()) cfg.web_password = newWebPassword;
             }
-            cfg.wifi_timeout_sec = _clampU16(doc["wifi_timeout_sec"] | cfg.wifi_timeout_sec, 10, 120);
+            cfg.wifi_timeout_sec = _clampU16(_jsonU16Or(doc, "wifi_timeout_sec", cfg.wifi_timeout_sec), 10, 120);
             cfg.ntp1             = doc["ntp1"]             | cfg.ntp1.c_str();
             cfg.ntp2             = doc["ntp2"]             | cfg.ntp2.c_str();
             cfg.ntp3             = doc["ntp3"]             | cfg.ntp3.c_str();
-            cfg.ntp_interval_min = _clampU16(doc["ntp_interval_min"] | cfg.ntp_interval_min, 5, 1440);
+            cfg.ntp_interval_min = _clampU16(_jsonU16Or(doc, "ntp_interval_min", cfg.ntp_interval_min), 5, 1440);
             cfg.tz               = doc["tz"]               | cfg.tz.c_str();
             if (_jsonHasString(doc, "owm_apikey")) {
                 String newApiKey = _jsonString(doc, "owm_apikey");
@@ -744,7 +778,7 @@ void webServerSetup() {
             cfg.owm_lon          = doc["owm_lon"]          | cfg.owm_lon;
             cfg.owm_use_coords   = doc["owm_use_coords"]   | cfg.owm_use_coords;
             cfg.owm_unit         = _clampU8(doc["owm_unit"] | cfg.owm_unit, 0, 1);
-            cfg.owm_interval_min = _clampU16(doc["owm_interval_min"] | cfg.owm_interval_min, 10, 1440);
+            cfg.owm_interval_min = _clampU16(_jsonU16Or(doc, "owm_interval_min", cfg.owm_interval_min), 10, 1440);
             uint8_t oldPanelCols = cfg.display_panel_cols;
             uint8_t oldPanelRows = cfg.display_panel_rows;
             uint8_t oldPanelMap  = cfg.display_panel_map;
