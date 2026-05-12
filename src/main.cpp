@@ -145,6 +145,27 @@ static void updateBme680Readings(bool force = false) {
 
 static inline uint8_t _bcdToDec(uint8_t v) { return (uint8_t)(((v >> 4) * 10) + (v & 0x0F)); }
 static inline uint8_t _decToBcd(uint8_t v) { return (uint8_t)((((v / 10) & 0x0F) << 4) | (v % 10)); }
+
+static int32_t _daysFromCivil(int32_t y, uint32_t m, uint32_t d) {
+    y -= (m <= 2) ? 1 : 0;
+    const int32_t era = (y >= 0 ? y : y - 399) / 400;
+    const uint32_t yoe = (uint32_t)(y - era * 400);
+    const uint32_t doy = (153 * (m + (m > 2 ? (uint32_t)-3 : 9)) + 2) / 5 + d - 1;
+    const uint32_t doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    return era * 146097 + (int32_t)doe - 719468;
+}
+
+static time_t _epochFromUtcTm(const struct tm& t) {
+    int32_t year = t.tm_year + 1900;
+    uint32_t month = (uint32_t)(t.tm_mon + 1);
+    uint32_t day = (uint32_t)t.tm_mday;
+    int32_t days = _daysFromCivil(year, month, day);
+    int64_t sec = (int64_t)days * 86400LL
+                + (int64_t)t.tm_hour * 3600LL
+                + (int64_t)t.tm_min * 60LL
+                + (int64_t)t.tm_sec;
+    return (time_t)sec;
+}
 static bool applySystemTimeEpoch(time_t epoch, bool writeRtc, const String& source, const String& detail = "");
 
 static uint8_t luxToBrightness(float lux) {
@@ -293,19 +314,17 @@ static bool ds3231ReadEpoch(time_t& outEpoch) {
     t.tm_mday = _bcdToDec(mdayRaw & 0x3F);
     t.tm_mon  = _bcdToDec(monRaw & 0x1F) - 1;
     t.tm_year = _bcdToDec(yearRaw) + 100; // 2000..2099
-    t.tm_isdst = -1;
-
     if (t.tm_year < 124 || t.tm_mon < 0 || t.tm_mon > 11 || t.tm_mday < 1 || t.tm_mday > 31) {
         return false;
     }
-    outEpoch = mktime(&t);
+    outEpoch = _epochFromUtcTm(t);
     return outEpoch > 1700000000L;
 }
 
 static bool ds3231WriteEpoch(time_t epoch) {
     if (!i2cDs3231Present) return false;
     struct tm t;
-    localtime_r(&epoch, &t);
+    gmtime_r(&epoch, &t);
 
     uint8_t dow = (uint8_t)(t.tm_wday == 0 ? 7 : t.tm_wday); // DS3231: 1..7
     uint8_t buf[8] = {
@@ -939,8 +958,7 @@ void loop() {
     if (nowMs - lastNtpSync >= ntpInterval) {
         watchdogSetPhase("ntp-resync");
         lastNtpSync = nowMs;
-        configTzTime(cfg.tz.c_str(), cfg.ntp1.c_str(),
-                     cfg.ntp2.c_str(), cfg.ntp3.c_str());
+        ntpSync();
         Serial.println("[NTP] Re-Sync.");
     }
 
