@@ -13,6 +13,10 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ### Fixed
 
+- Zeitzonenwechsel wirkt jetzt sofort: `TZ` und die Zeitzonen-Neuberechnung werden direkt nach dem Laden der Konfiguration und beim Speichern von `tz` angewendet (nicht erst indirekt im NTP-Pfad). Dadurch reagiert die angezeigte Uhrzeit sofort auf geaenderte Zeitzonenwerte. [pending]
+
+- NTP-Sync-Pfad auf Dottie-Logik umgestellt: Der Sync holt die Zeit jetzt direkt per NTP-UDP-Probe (`txSec`) vom gewaehlten Server und schreibt genau diesen Zeitwert in die RTC. Damit kann die RTC nicht mehr nur wegen vorhandener Altzeit als scheinbar "synchronisiert" gelten. [pending]
+
 - DS3231-Epoch-Konvertierung auf Dottie-Stand gebracht: RTC-Datum/Zeit wird jetzt mit derselben UTC-Logik (inkl. Century-Bit und strikter Feldpruefung) dekodiert wie in Dottie, damit keine fehlerhaften Epochen aus gueltig aussehenden Registerwerten entstehen. [426f783]
 
 - Zeitfuehrung wieder auf das gewuenschte Modell zurueckgestellt: DS3231 bleibt die Laufzeit-Zeitquelle, NTP synchronisiert ausschliesslich die RTC. Die kurzzeitig aktivierte NTP-Direktfuehrung wurde vollstaendig entfernt. [426f783]

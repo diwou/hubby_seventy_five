@@ -8,6 +8,7 @@
 #include <Arduino.h>
 #include <esp_system.h>
 #include <WiFi.h>
+#include <WiFiUdp.h>
 #include <ESPmDNS.h>
 #include <LittleFS.h>
 #include <Wire.h>
@@ -52,6 +53,7 @@ static constexpr uint8_t I2C_ADDR_DS3231 = 0x68;
 static constexpr uint8_t I2C_ADDR_VEML7700 = 0x10;
 static constexpr uint8_t I2C_ADDR_BME680_0 = 0x76;
 static constexpr uint8_t I2C_ADDR_BME680_1 = 0x77;
+static constexpr uint16_t NTP_PROBE_TIMEOUT_MS = 900;
 static constexpr uint32_t FACTORY_RESET_HOLD_MS = 4000UL;
 static uint32_t factoryResetPressStartMs = 0;
 static bool factoryResetHandled = false;
@@ -713,38 +715,107 @@ static void startAP() {
 // ============================================================
 // NTP konfigurieren + synchronisieren
 // ============================================================
-static void ntpSync() {
-    watchdogSetPhase("ntp-sync");
-    configTzTime(cfg.tz.c_str(),
-                 cfg.ntp1.c_str(),
-                 cfg.ntp2.c_str(),
-                 cfg.ntp3.c_str());
+static bool ntpProbeOnce(const String& host, uint16_t timeoutMs, uint32_t* txSecOut = nullptr) {
+    if (!host.length()) return false;
+    if (WiFi.status() != WL_CONNECTED) return false;
 
-    Serial.print("[NTP] Warte auf Synchronisation...");
-    struct tm t;
+    IPAddress ip;
+    bool resolved = false;
+    for (uint8_t attempt = 0; attempt < 3 && !resolved; attempt++) {
+        if (WiFi.hostByName(host.c_str(), ip)) resolved = true;
+        else delay(80);
+    }
+    if (!resolved) return false;
+
+    static uint16_t localPort = 2390;
+    static WiFiUDP udp;
+    udp.stop();
+    if (!udp.begin(localPort)) {
+        localPort = (localPort < 2500) ? localPort + 1 : 2390;
+        if (!udp.begin(localPort)) return false;
+    }
+
+    while (udp.parsePacket() > 0) {
+        uint8_t dump[64];
+        udp.read(dump, 64);
+    }
+
+    uint8_t pkt[48] = {};
+    pkt[0] = 0x1B;
+
+    if (!udp.beginPacket(ip, 123)) {
+        udp.stop();
+        return false;
+    }
+    if (udp.write(pkt, 48) != 48) {
+        udp.stop();
+        return false;
+    }
+    if (!udp.endPacket()) {
+        udp.stop();
+        return false;
+    }
+
     uint32_t start = millis();
-    while (!getLocalTime(&t, 200)) {
-        appWatchdogFeed();
-        if (millis() - start > 10000) {
-            Serial.println(" Timeout!");
-            return;
+    while (millis() - start < timeoutMs) {
+        int len = udp.parsePacket();
+        if (len > 0) {
+            uint8_t buf[48];
+            int n = udp.read(buf, min(len, 48));
+            udp.stop();
+            if (n < 48) return false;
+            if ((buf[0] & 7) != 4) return false;
+            uint32_t txSec = ((uint32_t)buf[40] << 24) | ((uint32_t)buf[41] << 16)
+                           | ((uint32_t)buf[42] << 8) | (uint32_t)buf[43];
+            if (!txSec) return false;
+            if (txSecOut) *txSecOut = txSec;
+            return true;
         }
-        Serial.print(".");
+        delay(10);
+    }
+    udp.stop();
+    return false;
+}
+
+static String chooseBestNtp() {
+    if (ntpProbeOnce(cfg.ntp1, NTP_PROBE_TIMEOUT_MS)) return cfg.ntp1;
+    if (ntpProbeOnce(cfg.ntp2, NTP_PROBE_TIMEOUT_MS)) return cfg.ntp2;
+    if (ntpProbeOnce(cfg.ntp3, NTP_PROBE_TIMEOUT_MS)) return cfg.ntp3;
+    return "";
+}
+
+static bool ntpSync() {
+    watchdogSetPhase("ntp-sync");
+    ntpSynced = false;
+    Serial.print("[NTP] UDP-Probe...");
+    String best = chooseBestNtp();
+    uint32_t txSec = 0;
+    bool ok = ntpProbeOnce(best.length() ? best : cfg.ntp1, NTP_PROBE_TIMEOUT_MS, &txSec);
+    if (!ok || txSec == 0) {
+        Serial.println(" fehlgeschlagen.");
+        return false;
     }
     Serial.println(" OK");
-    time_t now = time(nullptr);
+
+    time_t now = (time_t)(txSec - 2208988800UL);
+    if (now < 1700000000L) {
+        Serial.println("[NTP] Ungueltiger NTP-Zeitwert.");
+        return false;
+    }
     lastNtpSyncEpoch = now;
     if (i2cDs3231Present) {
         if (applySystemTimeEpoch(now, true, "DS3231 aktiv", "RTC von NTP korrigiert")) {
             rtcTimeValid = true;
         } else {
             rtcSetSource("keine", "RTC konnte nicht geschrieben werden");
+            return false;
         }
     } else {
-        rtcSetSource("NTP aktiv", "keine RTC");
+        rtcSetSource("NTP aktiv", best.length() ? best : cfg.ntp1);
     }
     ntpSynced    = true;
     lastNtpSync  = millis();
+    return true;
 }
 
 // ============================================================
@@ -785,6 +856,8 @@ void setup() {
             else Serial.println("[FS] Keine gueltige Config gefunden, Defaults konnten nicht gespeichert werden.");
         }
     }
+    setenv("TZ", cfg.tz.c_str(), 1);
+    tzset();
 
     pinMode(PIN_FACTORY_RESET, INPUT_PULLUP);
     Wire.begin(I2C_PIN_SDA, I2C_PIN_SCL);
