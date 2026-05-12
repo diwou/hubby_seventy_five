@@ -13,7 +13,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ### Fixed
 
-- RTC/NTP-Zeitbasis korrigiert: Die DS3231 wird intern jetzt konsistent als UTC gelesen/geschrieben (keine lokale Zeitzonen-Interpretation mehr), wodurch der beobachtete Stundenversatz verschwindet; zusaetzlich fuehrt der periodische NTP-Intervall-Trigger nun einen echten `ntpSync()` aus, damit die RTC regelmaessig nachgezogen wird. [pending]
+- RTC/NTP-Zeitbasis korrigiert: Die DS3231 wird intern jetzt konsistent als UTC gelesen/geschrieben (keine lokale Zeitzonen-Interpretation mehr), wodurch der beobachtete Stundenversatz verschwindet; zusaetzlich fuehrt der periodische NTP-Intervall-Trigger nun einen echten `ntpSync()` aus, damit die RTC regelmaessig nachgezogen wird. [0fba337]
 
 - NTP-Konfigurationsspeicherung gehaertet: `Sync-Intervall (min)` wird jetzt robust als Ganzzahl uebernommen (kein unbeabsichtigter Fallback mehr auf `5`), und eine leere/ungueltige Zeitzone faellt auf den Berlin-Standard zurueck statt eine falsche lokale Uhrzeit zu erzeugen. [c5bd3de]
 
