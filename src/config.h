@@ -140,7 +140,7 @@ static inline void configSanitize() {
 
     if (cfg.lang != "de" && cfg.lang != "en") cfg.lang = "de";
     if (cfg.tz.isEmpty()) cfg.tz = "CET-1CEST,M3.5.0,M10.5.0/3";
-    if (cfg.ntp_interval_min < 5) cfg.ntp_interval_min = 5;
+    if (cfg.ntp_interval_min < 1) cfg.ntp_interval_min = 1;
     if (cfg.ntp_interval_min > 1440) cfg.ntp_interval_min = 1440;
     if (cfg.owm_interval_min < 10) cfg.owm_interval_min = 10;
     if (cfg.owm_interval_min > 1440) cfg.owm_interval_min = 1440;

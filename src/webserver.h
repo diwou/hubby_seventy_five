@@ -95,10 +95,27 @@ static uint16_t _clampU16(uint32_t value, uint16_t minVal, uint16_t maxVal) {
 static uint16_t _jsonU16Or(JsonDocument& doc, const char* key, uint16_t fallback) {
     JsonVariantConst v = doc[key];
     if (v.isNull()) return fallback;
+    if (v.is<unsigned short>()) return v.as<unsigned short>();
     if (v.is<uint16_t>()) return v.as<uint16_t>();
+    if (v.is<unsigned int>()) {
+        unsigned int n = v.as<unsigned int>();
+        if (n > 65535U) return 65535U;
+        return (uint16_t)n;
+    }
     if (v.is<int>()) {
         int n = v.as<int>();
         if (n < 0) return 0;
+        return (uint16_t)n;
+    }
+    if (v.is<unsigned long>()) {
+        unsigned long n = v.as<unsigned long>();
+        if (n > 65535UL) return 65535U;
+        return (uint16_t)n;
+    }
+    if (v.is<signed long>()) {
+        signed long n = v.as<signed long>();
+        if (n < 0) return 0;
+        if (n > 65535L) return 65535U;
         return (uint16_t)n;
     }
     if (v.is<float>()) {
@@ -230,7 +247,7 @@ input[type=checkbox]{width:auto;margin-right:6px}
   <label>NTP Server 1 <input id="ntp1" maxlength="64"></label>
   <label>NTP Server 2 <input id="ntp2" maxlength="64"></label>
   <label>NTP Server 3 <input id="ntp3" maxlength="64"></label>
-  <label>Sync-Intervall (min) <input id="ntp_interval_min" type="number" min="5" max="1440"></label>
+  <label>Sync-Intervall (min) <input id="ntp_interval_min" type="number" min="1" max="1440"></label>
   <label>Zeitzone (POSIX-String)
     <select id="tz_preset" onchange="document.getElementById('tz').value=this.value">
       <option value="">-- Preset wählen --</option>
@@ -767,8 +784,10 @@ void webServerSetup() {
             cfg.ntp1             = doc["ntp1"]             | cfg.ntp1.c_str();
             cfg.ntp2             = doc["ntp2"]             | cfg.ntp2.c_str();
             cfg.ntp3             = doc["ntp3"]             | cfg.ntp3.c_str();
-            cfg.ntp_interval_min = _clampU16(_jsonU16Or(doc, "ntp_interval_min", cfg.ntp_interval_min), 5, 1440);
+            cfg.ntp_interval_min = _clampU16(_jsonU16Or(doc, "ntp_interval_min", cfg.ntp_interval_min), 1, 1440);
             cfg.tz               = doc["tz"]               | cfg.tz.c_str();
+            setenv("TZ", cfg.tz.c_str(), 1);
+            tzset();
             if (_jsonHasString(doc, "owm_apikey")) {
                 String newApiKey = _jsonString(doc, "owm_apikey");
                 if (!newApiKey.isEmpty()) cfg.owm_apikey = newApiKey;
