@@ -13,7 +13,7 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ### Fixed
 
-- NTP-Konfigurationsspeicherung gehaertet: `Sync-Intervall (min)` wird jetzt robust als Ganzzahl uebernommen (kein unbeabsichtigter Fallback mehr auf `5`), und eine leere/ungueltige Zeitzone faellt auf den Berlin-Standard zurueck statt eine falsche lokale Uhrzeit zu erzeugen. [ntp-config-fix-20260512]
+- NTP-Konfigurationsspeicherung gehaertet: `Sync-Intervall (min)` wird jetzt robust als Ganzzahl uebernommen (kein unbeabsichtigter Fallback mehr auf `5`), und eine leere/ungueltige Zeitzone faellt auf den Berlin-Standard zurueck statt eine falsche lokale Uhrzeit zu erzeugen. [c5bd3de]
 
 - Nach der Verschiebung der Datumszeile im 1x-HUB75-Modus wurde der Wetter-Clear-Bereich ebenfalls nach unten angepasst, damit die untere Datumszeile nicht mehr vom Wetter-Redraw geloescht wird. [9b54a0e]
 
