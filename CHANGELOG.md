@@ -13,9 +13,9 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ### Fixed
 
-- DS3231-Epoch-Konvertierung auf Dottie-Stand gebracht: RTC-Datum/Zeit wird jetzt mit derselben UTC-Logik (inkl. Century-Bit und strikter Feldpruefung) dekodiert wie in Dottie, damit keine fehlerhaften Epochen aus gueltig aussehenden Registerwerten entstehen. [pending]
+- DS3231-Epoch-Konvertierung auf Dottie-Stand gebracht: RTC-Datum/Zeit wird jetzt mit derselben UTC-Logik (inkl. Century-Bit und strikter Feldpruefung) dekodiert wie in Dottie, damit keine fehlerhaften Epochen aus gueltig aussehenden Registerwerten entstehen. [426f783]
 
-- Zeitfuehrung wieder auf das gewuenschte Modell zurueckgestellt: DS3231 bleibt die Laufzeit-Zeitquelle, NTP synchronisiert ausschliesslich die RTC. Die kurzzeitig aktivierte NTP-Direktfuehrung wurde vollstaendig entfernt. [pending]
+- Zeitfuehrung wieder auf das gewuenschte Modell zurueckgestellt: DS3231 bleibt die Laufzeit-Zeitquelle, NTP synchronisiert ausschliesslich die RTC. Die kurzzeitig aktivierte NTP-Direktfuehrung wurde vollstaendig entfernt. [426f783]
 
 - DS3231-Stundendekodierung korrigiert: Der RTC-Read-Pfad wertet jetzt 12h- und 24h-Modus korrekt aus (inkl. AM/PM-Bit), damit kein Stundenfehler mehr entsteht, wenn das Stundenregister nicht im 24h-Format vorliegt. [0ae65ba]
 
