@@ -13,6 +13,10 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ### Fixed
 
+- Zeitfuehrung im Laufbetrieb umgestellt: Bei aktiver WLAN-/NTP-Verbindung nutzt die Anzeige jetzt direkt die Systemzeit (NTP), waehrend die DS3231 nur noch als Fallback ohne Netz dient. Damit folgt die Sekundenanzeige im Normalbetrieb wieder der NTP-Zeit statt einer potenziell abweichenden RTC-Fuehrung. [pending]
+
+- DS3231-Stundendekodierung korrigiert: Der RTC-Read-Pfad wertet jetzt 12h- und 24h-Modus korrekt aus (inkl. AM/PM-Bit), damit kein Stundenfehler mehr entsteht, wenn das Stundenregister nicht im 24h-Format vorliegt. [pending]
+
 - RTC/NTP-Zeitbasis korrigiert: Die DS3231 wird intern jetzt konsistent als UTC gelesen/geschrieben (keine lokale Zeitzonen-Interpretation mehr), wodurch der beobachtete Stundenversatz verschwindet; zusaetzlich fuehrt der periodische NTP-Intervall-Trigger nun einen echten `ntpSync()` aus, damit die RTC regelmaessig nachgezogen wird. [0fba337]
 
 - NTP-Konfigurationsspeicherung gehaertet: `Sync-Intervall (min)` wird jetzt robust als Ganzzahl uebernommen (kein unbeabsichtigter Fallback mehr auf `5`), und eine leere/ungueltige Zeitzone faellt auf den Berlin-Standard zurueck statt eine falsche lokale Uhrzeit zu erzeugen. [c5bd3de]

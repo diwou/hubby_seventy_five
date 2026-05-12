@@ -310,7 +310,18 @@ static bool ds3231ReadEpoch(time_t& outEpoch) {
     struct tm t = {};
     t.tm_sec  = _bcdToDec(secRaw & 0x7F);
     t.tm_min  = _bcdToDec(minRaw & 0x7F);
-    t.tm_hour = _bcdToDec(hourRaw & 0x3F);
+    if (hourRaw & 0x40) {
+        // 12h-Modus: Bit5 = PM, Bit4..0 = Stunde (1..12)
+        uint8_t hour12 = _bcdToDec(hourRaw & 0x1F);
+        bool isPm = (hourRaw & 0x20) != 0;
+        if (hour12 < 1 || hour12 > 12) return false;
+        uint8_t hour24 = hour12 % 12;
+        if (isPm) hour24 += 12;
+        t.tm_hour = hour24;
+    } else {
+        // 24h-Modus: Bit5..0 = Stunde (00..23)
+        t.tm_hour = _bcdToDec(hourRaw & 0x3F);
+    }
     t.tm_mday = _bcdToDec(mdayRaw & 0x3F);
     t.tm_mon  = _bcdToDec(monRaw & 0x1F) - 1;
     t.tm_year = _bcdToDec(yearRaw) + 100; // 2000..2099
@@ -919,19 +930,25 @@ void loop() {
         return;
     }
 
-    // Aktuelle Zeit holen
+    // Aktuelle Zeit holen:
+    // - Mit WLAN/NTP: direkte Systemzeit (NTP-geführt)
+    // - Ohne NTP: DS3231 als Fallback
     struct tm t;
     bool timeOk = false;
-    if (i2cDs3231Present) {
+    bool hasUsableTime = false;
+    if (wifiConnected && ntpSynced) {
+        timeOk = getLocalTime(&t, 10);
+        hasUsableTime = timeOk;
+    } else if (i2cDs3231Present) {
         rtcRefreshSystemTime();
         time_t nowEpoch = time(nullptr);
         localtime_r(&nowEpoch, &t);
         timeOk = rtcTimeValid;
+        hasUsableTime = timeOk && rtcTimeValid;
     } else {
         timeOk = getLocalTime(&t, 10);
+        hasUsableTime = timeOk && ntpSynced;
     }
-
-    bool hasUsableTime = timeOk && (i2cDs3231Present ? rtcTimeValid : ntpSynced);
     if (!hasUsableTime) {
         watchdogSetPhase("ntp-wait");
         if (lastStatusMsg != "NTP sync..") {
@@ -957,7 +974,6 @@ void loop() {
     uint32_t ntpInterval = (uint32_t)cfg.ntp_interval_min * 60000UL;
     if (nowMs - lastNtpSync >= ntpInterval) {
         watchdogSetPhase("ntp-resync");
-        lastNtpSync = nowMs;
         ntpSync();
         Serial.println("[NTP] Re-Sync.");
     }
