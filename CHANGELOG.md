@@ -13,6 +13,8 @@ Ab `1.6.0` stehen Codeberg-Referenzen direkt an den einzelnen Aenderungspunkten 
 
 ### Fixed
 
+- Der Ziffernwechsel startet wieder sichtbar bei Frame 0: Die Subsekunden-Vorpositionierung wurde fuer die Flip-Animation entfernt, damit `Slide-Up` im Praxisbetrieb wieder klar als Scroll-Effekt erkennbar ist. [pending]
+
 - NTP-Sync-Intervall respektiert jetzt die Nutzer-Anforderung `min=1`: Web-UI, Server-Validierung und Konfigurations-Sanitizing akzeptieren jetzt Werte von `1..1440` Minuten statt zuvor `5..1440`. [0be0c40]
 
 - Zeitzonenwechsel wirkt jetzt sofort: `TZ` und die Zeitzonen-Neuberechnung werden direkt nach dem Laden der Konfiguration und beim Speichern von `tz` angewendet (nicht erst indirekt im NTP-Pfad). Dadurch reagiert die angezeigte Uhrzeit sofort auf geaenderte Zeitzonenwerte. [fe4e5eb]

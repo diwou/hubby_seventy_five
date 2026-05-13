@@ -466,17 +466,8 @@ static void _setFlipDigit(int i, char c, int startFrame = 0, int msIntoFrame = 0
 }
 
 static void _setFlipTime(int h, int m, int s) {
-    // Subsekunden-Kompensation: Animation synchron zur NTP-Sekunde starten.
-    // gettimeofday() liefert die exakten µs in der aktuellen Sekunde.
-    // Beide NTP-Uhren starten dadurch am selben Frame — unabhängig vom Loop-Timing.
-    struct timeval tv;
-    gettimeofday(&tv, nullptr);
-    int msInSec     = (int)(tv.tv_usec / 1000);  // 0..999 ms in der aktuellen Sekunde
-    int mspf        = (cfg.anim_mode == 0) ? 15 : 18;
-    int visibleH    = _digitVisibleHeight();
-    int maxFr       = (cfg.anim_mode == 0) ? (visibleH * 2 - 1) : 14;
-    int startFr     = (cfg.anim_mode == 2) ? 0 : min(msInSec / mspf, maxFr - 1);
-    int msIntoFrame = (cfg.anim_mode == 2) ? 0 : (msInSec % mspf);
+    int startFr = 0;
+    int msIntoFrame = 0;
 
     int h_disp = h;
     if (cfg.time_12h) {
